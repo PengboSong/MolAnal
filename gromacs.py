@@ -221,93 +221,85 @@ def boxpara(arrayxyz, extend = 1.10):
 		return (xmax-xmin) * (1+extend), (ymax-ymin) * (1+extend), (zmax-zmin) * (1+extend)
 	else:
 		raise ValueError("Get wrong paramters when calling function boxpara in module gromacs. Paramter arrayxyz should be a two-dim numpy.ndarray with three columns.")
-class pdb2gro(object):
-	def __init__(self, pdbpath, csvpath, maxsize = 209715200):
-		self.data = {}
-		self.modif = {}
+def pdb2gro(pdbpath, csvpath, writepath, maxsize = 209715200):
+		# Initialize dict
+		data = {}
+		modif = {}
+		# Load pdb file
 		with open(pdbpath, 'r') as f:
 			row = 0
 			for line in f.readlines(maxsize):
 				row += 1
 				if line[0:6] in ("ATOM  ", "HETATM"):
 					line_data = readline_pdb(line, row)
-					self.data.update({line_data.get("atom_serial_number"):line_data})
+					data.update({line_data.get("atom_serial_number"):line_data})
+		# Load csv file recording completion lines
 		with open(csvpath, 'r') as f:
 			row = 0
 			for line in f.readlines(maxsize):
 				row += 1
 				line_modif = readline_csv_spec(line, row)
 				if line_modif:
-					self.modif.update({line_modif.get("new_atom_serial_number"):line_modif})
-	def write(self, pdbpath):
+					modif.update({line_modif.get("new_atom_serial_number"):line_modif})
+		# Write parts
 		lxyz, lout = [], []
-		for newid in self.modif.keys():
-			modifterm = self.modif.get(newid)
-			outerm = self.data.get(modifterm.get("atom_serial_number")).copy()
+		for newid in modif.keys():
+			modifterm = modif.get(newid)
+			outerm = data.get(modifterm.get("atom_serial_number")).copy()
 			outerm.update(modifterm)
 			outerm.update({"molecular_id":modifterm.get("residue_sequence_number")})
 			lout.append(outerm)
 			lxyz.append((outerm.get("coordinate_x"), outerm.get("coordinate_y"), outerm.get("coordinate_z")))
-		with open(pdbpath, 'w') as f:
+		# Get the
+		xbox, ybox, zbox = boxpara(np.array(lxyz))
+		with open(writepath, 'w') as f:
 			if os.path.splitext(pdbpath)[1] == ".pdb":
+				# Need Completion
 				pass
 			if os.path.splitext(pdbpath)[1] == ".gro":
-				xbox, ybox, zbox = boxpara(np.array(lxyz))
+				# Default title
 				f.write("GROtesk MACabre and Sinister" + '\n')
+				# Total atom numbers
 				f.write('{0:>5}'.format(len(lout)) + '\n')
 				for term in lout:
 					f.write('{0:>5}'.format(term.get("molecular_id") or " ") + '{0:<4}'.format(term.get("residual_name") or " ") + '{0:1}'.format(term.get("chain_identifier") or " ") + '{0:>4}'.format(term.get("atom_name") or " ") + '{0:>5}'.format(term.get("atom_serial_number") or " ") + '{0:>8}'.format(format(term.get("coordinate_x")/10, '.3f') or " ") + '{0:>8}'.format(format(term.get("coordinate_y")/10, '.3f') or " ") + '{0:>8}'.format(format(term.get("coordinate_z")/10, '.3f') or " ") + '\n')
+				# Solvate box parameters
 				f.write('{0:>10.5f}'.format(xbox/10) + '{0:>10.5f}'.format(ybox/10) + '{0:>10.5f}'.format(zbox/10) + '\n')
-class pdb2atomatrix(object):
-	def __init__(self, pdbpath, maxsize = 209715200):
-		self.atoms = {}
-		with open(pdbpath, "r") as f:
-			rown = 0
-			if os.path.splitext(pdbpath)[1] == ".pdb":
-				atomn = 0
-				for line in f.readlines(maxsize):
-					if line[0:6] in ("ATOM  ", "HETATM"):
-						line_data = readline_pdb(line, rown)
-						atom_matrix = {"name":line_data.get("atom_name"), "resid":line_data.get("residue_sequence_number"), "resname":line_data.get("residual_name"), "coordinate":np.array([line_data.get("coordinate_x")/10, line_data.get("coordinate_y")/10, line_data.get("coordinate_z")/10]), "velocity":np.array([0., 0., 0.])}
-						self.atoms.update({line_data.get("atom_serial_number"):atom_matrix})
-			elif os.path.splitext(pdbpath)[1] == ".gro":
+def pdb2atomatrix(pdbpath, maxsize = 209715200):
+	# Initialize atom matrix dict
+	atoms = {}
+	# Read input file
+	with open(pdbpath, "r") as f:
+		# Start counting number of lines
+		rown = 0
+		# pdb file
+		if os.path.splitext(pdbpath)[1] == ".pdb":
+			for line in f.readlines(maxsize):
+				if line[0:6] in ("ATOM  ", "HETATM"):
+					line_data = readline_pdb(line, rown)
+					atom_matrix = {"name":line_data.get("atom_name"), "resid":line_data.get("residue_sequence_number"), "resname":line_data.get("residual_name"), "coordinate":np.array([line_data.get("coordinate_x")/10, line_data.get("coordinate_y")/10, line_data.get("coordinate_z")/10]), "velocity":np.array([0., 0., 0.])}
+					atoms.update({line_data.get("atom_serial_number"):atom_matrix})
+		# gro file
+		elif os.path.splitext(pdbpath)[1] == ".gro":
+			rown += 1
+			title = f.readline().strip()
+			rown += 1
+			atomn = f.readline().strip()
+			# Second line should be an integer equals to total atom numbers
+			try:
+				atomn = int(atomn)
+			except Exception as e:
+				raise ValueError("Incorrect gromacs file format. Please check file at path %s." % pdbpath)
+			for line in f.readlines(maxsize):
 				rown += 1
-				title = f.readline().strip()
-				rown += 1
-				atomn = f.readline().strip()
-				try:
-					atomn = int(atomn)
-				except Exception as e:
-					raise ValueError("Incorrect gromacs file format. Please check file at path %s." % pdbpath)
-				for line in f.readlines(maxsize):
-					rown += 1
-					if rown < atomn + 3:
-						line_data = readline_gro(line, rown)
-						atom_matrix = {"name":line_data.get("atom_name"), "resid":line_data.get("mol_id"), "resname":line_data.get("mol_name"), "coordinate":np.array([line_data.get("x"), line_data.get("y"), line_data.get("z")]), "velocity":np.array([line_data.get("vx"), line_data.get("vy"), line_data.get("vz")])}
-						self.atoms.update({line_data.get("atom_id"):atom_matrix})
-	def origin(self):
-		return self.atoms
-	def cut(self, centeratom = 1, shape = "sphere", parameter = (1.0,), user = True):
-		shapeopts = {1:"sphere"}
-		groups = self.cluster()
-		if user is True:
-			print("-*-*-Interactive Mode-*-*-")
-			shape = shapeopts.get(verify_selection(shapeopts, "Choose one cutting geometry:"))
-			if shape in ["sphere"]:
-				 radius = verify_type(float, "Enter the radius of the sphere(unit: nm):")
-				 parameter = (radius,)
-				 centeratom = verify_type(int, "Enter ID of selected atom(as the center of the sphere):", ("<=%d" % len(self.atoms), ">0"))
-		center = np.array(self.atoms.get(centeratom).get("coordinate"))
-		if shape in ["sphere"]:
-			inside, outside = {}, {}
-			radius = parameter[0]
-			for i in range(1, len(self.atoms)+1):
-				diffcoord = self.atoms.get(i).get("coordinate") - center
-				if np.dot(diffcoord, diffcoord) < radius**2:
-					inside.update({i:self.atoms.get(i)})
-				else:
-					outside.update({i:self.atoms.get(i)})
-			return inside, outside
+				# Line 'atomn + 3' should be solvate box parameters
+				if rown < atomn + 3:
+					line_data = readline_gro(line, rown)
+					atom_matrix = {"name":line_data.get("atom_name"), "resid":line_data.get("mol_id"), "resname":line_data.get("mol_name"), "coordinate":np.array([line_data.get("x"), line_data.get("y"), line_data.get("z")]), "velocity":np.array([line_data.get("vx"), line_data.get("vy"), line_data.get("vz")])}
+					atoms.update({line_data.get("atom_id"):atom_matrix})
+		else:
+			raise ValueError("Can not load file that does not end with \"pdb\" or \"gro\".")
+	return atoms
 def pdb2molmatrix(pdbpath, maxsize = 209715200):
 	# Initialize molecular matrix dict
 	mols = {}
@@ -430,7 +422,7 @@ class Moledit(object):
 		elif isinstance(vector, (tuple, list)) and len(vector) == 3 and all([isinstance(v, (int, float)) for v in vector]):
 			vector = np.array(vector)
 		else:
-			raise TypeError("Get wrong parameters. Function move of class pdb2molmatrix expects vector to be able to convert to a 1*3 matrix.")
+			raise TypeError("Get wrong parameters. \"vector\" should be able to convert to a 1*3 matrix.")
 		if movemol not in self.mols.keys():
 			raise ValueError("Can not find target molecule in the file provided.")
 		# Move
@@ -770,7 +762,7 @@ class TrajAnalysis(object):
 		self.trajcoord = []
 		self.trajn = num
 		# Load trajectory profile from the first frame(should end with number 0)
-		firstframe = pdb2molmatrix(os.path.join(dirpath, name + "0" + "." + frametype)).origin()
+		firstframe = pdb2molmatrix(os.path.join(dirpath, name + "0" + "." + frametype))
 		# Remove coordinate and velocity terms
 		# Add atom id term for each atom, begin counting
 		# Atom ids would be count from 1
@@ -785,10 +777,10 @@ class TrajAnalysis(object):
 		self.atomn = atomn - 1
 		# Only load coordinates data of each frame (including the first one) into a matrix (N*3)
 		for i in range(num):
-			mols = pdb2molmatrix(os.path.join(dirpath, name + repr(i) + "." + frametype)).origin()
+			mols = pdb2molmatrix(os.path.join(dirpath, name + repr(i) + "." + frametype))
 			self.trajcoord.append(np.vstack([mol.get("coordinate") for mol in mols.values()]))
 			print("[Info] File %s is loaded successfully." % (name + repr(i) + "." + frametype))
-	def distance(self, atomA, atomB, boxpara = (10., 10., 10.), pbc = True):
+	def distance(self, atomA, atomB):
 		if not isinstance(atomA, int) or not ((isinstance(atomB, int) or (isinstance(atomB, (tuple, list)) and all([isinstance(v, int) for v in atomB])))):
 			raise ValueError("Wrong parameters. Function distance expects the first parameter should be ID for central atom and the second one be either one ID or some IDs packed in a tuple or list for surrounding atom(s).")
 		if not (isinstance(boxpara, (tuple, list)) and len(boxpara) == 3 and all([isinstance(v, (int, float)) for v in boxpara])) or not isinstance(pbc, bool):
@@ -828,21 +820,12 @@ class TrajAnalysis(object):
 				# Original Coordinate
 				pair0 = coordA - framecoord[atomBi-1]
 				pairs = [pair0]
-				if pbc is True:
-					# Adjust Coordinate owing to periodic boundary condition(PBC)
-					pairpx = pair0 + np.array([boxpara[0], 0., 0.])
-					pairnx = pair0 - np.array([boxpara[0], 0., 0.])
-					pairpy = pair0 + np.array([0., boxpara[1], 0.])
-					pairny = pair0 - np.array([0., boxpara[1], 0.])
-					pairpz = pair0 + np.array([0., 0., boxpara[2]])
-					pairnz = pair0 - np.array([0., 0., boxpara[2]])
-					pairs.extend([pairpx, pairnx, pairpy, pairny, pairpz, pairnz])
 				findist = min([math.sqrt(x.dot(x)) for x in pairs])
 				log.append('{0:>6}'.format(framen) + " | " + '{0:>11.3f}'.format(findist))
 		print(titleline)
 		for line in log:
 			print(line)
-	def dist2plane(self, atom, plane, boxpara = (10., 10., 10.), pbc = True):
+	def dist2plane(self, atom, plane):
 		if not isinstance(atom, int) or not (isinstance(plane, (tuple, list)) and len(plane) >= 3 and all([isinstance(v, int) for v in plane])):
 			raise ValueError("Wrong parameters. Function distance expects two parameters: the former should be ID for central atom and the latter should be atom IDs in the reference plane.")
 		if not (isinstance(boxpara, (tuple, list)) and len(boxpara) == 3 and all([isinstance(v, (int, float)) for v in boxpara])) or not isinstance(pbc, bool):
@@ -863,13 +846,6 @@ class TrajAnalysis(object):
 			plps = fitplane([framecoord[x-1] for x in plane])	# Short of plane parameters
 			# Attention: plps should be a tuple with 4 elements, denoted as a, b, c, d. The plane equation should be ax+by+cz=0
 			plnormal = np.array(plps[0:3])
-			if pbc is True:
-				coords.append(coord + np.array([boxpara[0], 0., 0.]))
-				coords.append(coord - np.array([boxpara[0], 0., 0.]))
-				coords.append(coord + np.array([0., boxpara[1], 0.]))
-				coords.append(coord - np.array([0., boxpara[1], 0.]))
-				coords.append(coord + np.array([0., 0., boxpara[2]]))
-				coords.append(coord - np.array([0., 0., boxpara[2]]))
 			pldist = min([abs(plnormal.dot(c) + plps[3])/(plnormal.dot(plnormal))**(1/2) for c in coords])
 			log.append('{0:>6}'.format(framen) + " | " + '{0:>8.3f}'.format(pldist))
 		print(titleline)
