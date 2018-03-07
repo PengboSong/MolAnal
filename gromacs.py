@@ -373,118 +373,85 @@ class pdb2molmatrix(object):
 				self.mols.update({mol_id:mol_matrix})
 	def origin(self):
 		return self.mols
-	def cut(self, centermol = 1, shape = "sphere", parameter = (1.0,), user = True):
-		shapeopts = {1:"sphere"}
-		groups = cluster(self.mols)
-		if user is True:
-			print("-*-*-Interactive Mode-*-*-")
-			shape = shapeopts.get(verify_selection(shapeopts, "Choose one cutting geometry:"))
-			if shape in ["sphere"]:
-				 radius = verify_type((int, float), "Enter the radius of the sphere(unit: nm):")
-				 parameter = (radius,)
-				 for moltyp in groups.keys():
-					 if len(groups.get(moltyp)) > 10:
-						 print({moltyp:", ".join([str(x) for x in groups.get(moltyp)[0:10]]) + " and %d more molecules..." %(len(groups.get(moltyp))-10)})
-					 else:
-						 print({moltyp:", ".join([str(x) for x in groups.get(moltyp)[0:10]])})
-				 centermol = verify_type(int, "Enter ID of selected molecule(as the center of the sphere):", ("<=%d" % len(self.mols), ">0"))
+	def cut(self, centermol = 1, shape = "sphere", parameter = (1.0,)):
+		# Check
+		if centermol not in self.mols.keys():
+			raise ValueError("Can not find target molecule in the file provided.")
+		# Calculate coordinate of target molecular center
 		center = np.average(self.mols.get(centermol).get("coordinate").transpose(), axis=1)
+		# Cut a sphere around target molecular center
 		if shape in ["sphere"]:
 			inside, outside = [], []
 			radius = parameter[0]
+			# Scan all molecules
 			for i in range(1, len(self.mols)+1):
 				mol = self.mols.get(i)
 				molcenter = np.average(mol.get("coordinate").transpose(), axis=1)
+				# Put a molecule "inside" when its center is within the sphere
 				if np.dot(molcenter-np.array(center), molcenter-np.array(center)) < radius**2:
 					inside.update({i:mol})
+				# Or put it "outside"
 				else:
 					outside.append({i:mol})
 			return inside, outside
-	def move(self, movemol = 1, vector = [0., 0., 0.], user = True):
+		else:
+			raise ValueError("Unsupported operation name given.")
+	def move(self, movemol = 1, vector = [0., 0., 0.]):
+		# Check
 		if isinstance(vector, np.ndarray) and vector.ndim == 1 and vector.size == 3:
 			pass
 		elif isinstance(vector, (tuple, list)) and len(vector) == 3 and all([isinstance(v, (int, float)) for v in vector]):
 			vector = np.array(vector)
 		else:
 			raise TypeError("Get wrong parameters. Function move of class pdb2molmatrix expects vector to be able to convert to a 1*3 matrix.")
-		groups = cluster(self.mols)
-		# Interactive mode is activated when parameter user is True
-		if user is True:
-			print("-*-*-Interactive Mode-*-*-")
-			for moltyp in groups.keys():
-				if len(groups.get(moltyp)) > 10:
-					print({moltyp:", ".join([str(x) for x in groups.get(moltyp)[0:10]]) + " and %d more molecules..." %(len(groups.get(moltyp))-10)})
-				else:
-					print({moltyp:", ".join([str(x) for x in groups.get(moltyp)[0:10]])})
-			movemol = verify_type(int, "Enter ID of selected molecule(as the center of the sphere):", ("<=%d" % len(self.mols), ">0"))
-			vectorx = verify_type((int, float), "Enter x component of shift vector(unit: nm):", (">0",))
-			vectory = verify_type((int, float), "Enter y component of shift vector(unit: nm):", (">0",))
-			vectorz = verify_type((int, float), "Enter z component of shift vector(unit: nm):", (">0",))
-			vector = np.array([vectorx, vectory, vectorz])
-		if movemol in self.mols.keys():
-			self.mols.get(movemol).update({"coordinate":self.mols.get(movemol).get("coordinate")+vector})
-	def moveto(self, movemol = 1, vector = [0., 0., 0.], user = True):
+		if movemol not in self.mols.keys():
+			raise ValueError("Can not find target molecule in the file provided.")
+		# Move
+		self.mols.get(movemol).update({"coordinate":self.mols.get(movemol).get("coordinate")+vector})
+	def moveto(self, movemol = 1, point = [0., 0., 0.]):
+		# Check
 		if isinstance(vector, np.ndarray) and vector.ndim == 1 and vector.size == 3:
 			pass
 		elif isinstance(vector, (tuple, list)) and len(vector) == 3 and all([isinstance(v, (int, float)) for v in vector]):
 			vector = np.array(vector)
 		else:
-			raise TypeError("Get wrong parameters. Function moveto of class pdb2molmatrix expects vector to be able to convert to a 1*3 matrix.")
-		groups = cluster(self.mols)
-		# Interactive mode is activated when parameter user is True
-		if user is True:
-			print("-*-*-Interactive Mode-*-*-")
-			for moltyp in groups.keys():
-				if len(groups.get(moltyp)) > 10:
-					print({moltyp:", ".join([str(x) for x in groups.get(moltyp)[0:10]]) + " and %d more molecules..." %(len(groups.get(moltyp))-10)})
-				else:
-					print({moltyp:", ".join([str(x) for x in groups.get(moltyp)[0:10]])})
-			movemol = verify_type(int, "Enter ID of selected molecule(as the center of the sphere):", ("<=%d" % len(self.mols), ">0"))
-			vectorx = verify_type((int, float), "Enter x component of shift vector(unit: nm):", (">0",))
-			vectory = verify_type((int, float), "Enter y component of shift vector(unit: nm):", (">0",))
-			vectorz = verify_type((int, float), "Enter z component of shift vector(unit: nm):", (">0",))
-			vector = np.array([vectorx, vectory, vectorz])
-		if movemol in self.mols.keys():
-			center = np.average(self.mols.get(movemol).get("coordinate").transpose(), axis=1)
-			self.mols.get(movemol).update({"coordinate":self.mols.get(movemol).get("coordinate")+vector-center})
-	def orrient(self, movemol = 1, vector = [1., 1., 1.], user = False):
+			raise TypeError("Get wrong parameters. \"point\" should be able to convert to a 1*3 matrix.")
+		if movemol not in self.mols.keys():
+			raise ValueError("Can not find target molecule in the file provided.")
+		# Move target molecule to destination
+		# The molecule goes to where its center overlap the point
+		center = np.average(self.mols.get(movemol).get("coordinate").transpose(), axis=1)
+		self.mols.get(movemol).update({"coordinate":self.mols.get(movemol).get("coordinate")+vector-center})
+	def orrient(self, movemol = 1, vector = [1., 1., 1.]):
+		# Check
 		if isinstance(vector, np.ndarray) and vector.ndim == 1 and vector.size == 3:
 			pass
 		elif isinstance(vector, (tuple, list)) and len(vector) == 3 and all([isinstance(v, (int, float)) for v in vector]):
 			vector = np.array(vector)
 		else:
-			raise TypeError("Get wrong parameters. Function orrient of class pdb2molmatrix expects vector to be able to convert to a 1*3 matrix.")
+			raise TypeError("Get wrong parameters. \"vector\" should be able to convert to a 1*3 matrix.")
 		if all([v == 0 for v in vector]):
-			raise ValueError("Get wrong parameters. Function orrient of class pdb2molmatrix expects vector to be a non-zero vector.")
-		groups = cluster(self.mols)
-		# Interactive mode is activated when parameter user is True
-		if user is True:
-			print("-*-*-Interactive Mode-*-*-")
-			for moltyp in groups.keys():
-				if len(groups.get(moltyp)) > 10:
-					print({moltyp:", ".join([str(x) for x in groups.get(moltyp)[0:10]]) + " and %d more molecules..." %(len(groups.get(moltyp))-10)})
-				else:
-					print({moltyp:", ".join([str(x) for x in groups.get(moltyp)[0:10]])})
-			movemol = verify_type(int, "Enter ID of selected molecule(as the center of the sphere):", ("<=%d" % len(self.mols), ">0"))
-			vectorx = verify_type((int, float), "Enter x component of shift vector(unit: nm):", (">0",))
-			vectory = verify_type((int, float), "Enter y component of shift vector(unit: nm):", (">0",))
-			vectorz = verify_type((int, float), "Enter z component of shift vector(unit: nm):", (">0",))
-			vector = np.array([vectorx, vectory, vectorz])
+			raise ValueError("Get wrong parameters. \"vector\" should not be a zero vector.")
+		if movemol not in self.mols.keys():
+			raise ValueError("Can not find target molecule in the file provided.")
+		# Normalize
 		vector = vector/math.sqrt(vector.dot(vector))
-		if movemol in self.mols.keys():
-			center = np.average(self.mols.get(movemol).get("coordinate").transpose(), axis=1)
-			plps = fitplane([v for v in self.mols.get(movemol).get("coordinate")])
-			normal = np.array(plps[0:3])
-	def copy(self, copymol = 1, vector = [0., 0., 0.], user = True):
-		if isinstance(vector, np.ndarray) and vector.ndim == 1 and vector.size == 3:
-			pass
-		elif isinstance(vector, (tuple, list)) and len(vector) == 3 and all([isinstance(v, (int, float)) for v in vector]):
-			vector = np.array(vector)
-		else:
-			raise TypeError("Get wrong parameters. Function copy of class pdb2molmatrix expects vector to be able to convert to a 1*3 matrix.")
-		groups = cluster(self.mols)
-		# Need completion
-		pass
+		# Coordinate matrix of target molecule
+		molcoord = self.mols.get(movemol).get("coordinate")
+		center = np.average(molcoord.transpose(), axis=1)
+		# Get the normal vector determined by molecular coordinates
+		plps = fitplane([v for v in molcoord])
+		normal = np.array(plps[0:3])
+		# Rotation axis
+		axis = np.cross(normal, vector)
+		# Rotation angle
+		cosang = normal.dot(vector)/math.sqrt(normal.dot(normal)*vector.dot(vector))
+		sinang = math.sqrt(1-cosang**2)
+		# Rotate
+		newcoord = []
+		for i in range(len(molcoord)):
+			newcoord.append(rotate(molcoord[i]-center, axis, cosang, sinang) + center)
+		self.mols.get(movemol).update({"coordinate":np.array(newcoord)})
 class atomatrix2pdb(object):
 	def __init__(self, matrix):
 		self.atoms = matrix
