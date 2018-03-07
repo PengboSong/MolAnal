@@ -214,13 +214,14 @@ def readline_gro(line, row):
 	else:
 		vx, vy, vz = 0., 0., 0.
 	return {"mol_id":mol_id, "mol_name":mol_name, "chain":chain, "atom_name":atom_name, "atom_id":atom_id, "x":x, "y":y, "z":z, "vx":vx, "vy":vy, "vz":vz}
+# Attention: extend should be greater than 1
 def boxpara(arrayxyz, extend = 1.10):
-	if isinstance(arrayxyz, np.ndarray) and arrayxyz.ndim == 2 and arrayxyz.shape[1] == 3:
+	if isinstance(arrayxyz, np.ndarray) and arrayxyz.ndim == 2 and arrayxyz.shape[1] == 3 and isinstance(extend, (int, float)) and extend > 1:
 		xmin, ymin, zmin = np.min(arrayxyz, axis = 0)
 		xmax, ymax, zmax = np.max(arrayxyz, axis = 0)
 		return (xmax-xmin) * (1+extend), (ymax-ymin) * (1+extend), (zmax-zmin) * (1+extend)
 	else:
-		raise ValueError("Get wrong paramters when calling function boxpara in module gromacs. Paramter arrayxyz should be a two-dim numpy.ndarray with three columns.")
+		raise ValueError("Get wrong paramters. \"arrayxyz\" should be a two-dim numpy.ndarray with three columns and \"extend\" should be greater than 1.")
 def pdb2gro(pdbpath, csvpath, writepath, maxsize = 209715200):
 		# Initialize dict
 		data = {}
@@ -380,97 +381,6 @@ def pdb2molmatrix(pdbpath, maxsize = 209715200):
 		else:
 			raise ValueError("Can not load file that does not end with \"pdb\" or \"gro\".")
 	return mols
-class Moledit(object):
-	def __init__(self, pdbfile):
-		self.mols = pdb2molmatrix(pdbfile)
-		self.command()
-	def command(self):
-		cmd = input().strip()
-		while cmd != "exit":
-			cmd = input().strip()
-		save_and_exit = input("Save modifications?(Y/N)").strip().upper()
-		while save_and_exit not in ("Y", "N"):
-			save_and_exit = input("Save modifications?(Y/N)").strip().upper()
-		input("Press any key to exit...")
-	def cut(self, centermol = 1, shape = "sphere", parameter = (1.0,)):
-		# Check
-		if centermol not in self.mols.keys():
-			raise ValueError("Can not find target molecule in the file provided.")
-		# Calculate coordinate of target molecular center
-		center = np.average(self.mols.get(centermol).get("coordinate").transpose(), axis=1)
-		# Cut a sphere around target molecular center
-		if shape in ["sphere"]:
-			inside, outside = [], []
-			radius = parameter[0]
-			# Scan all molecules
-			for i in range(1, len(self.mols)+1):
-				mol = self.mols.get(i)
-				molcenter = np.average(mol.get("coordinate").transpose(), axis=1)
-				# Put a molecule "inside" when its center is within the sphere
-				if np.dot(molcenter-np.array(center), molcenter-np.array(center)) < radius**2:
-					inside.update({i:mol})
-				# Or put it "outside"
-				else:
-					outside.append({i:mol})
-			return inside, outside
-		else:
-			raise ValueError("Unsupported operation name given.")
-	def move(self, movemol = 1, vector = [0., 0., 0.]):
-		# Check
-		if isinstance(vector, np.ndarray) and vector.ndim == 1 and vector.size == 3:
-			pass
-		elif isinstance(vector, (tuple, list)) and len(vector) == 3 and all([isinstance(v, (int, float)) for v in vector]):
-			vector = np.array(vector)
-		else:
-			raise TypeError("Get wrong parameters. \"vector\" should be able to convert to a 1*3 matrix.")
-		if movemol not in self.mols.keys():
-			raise ValueError("Can not find target molecule in the file provided.")
-		# Move
-		self.mols.get(movemol).update({"coordinate":self.mols.get(movemol).get("coordinate")+vector})
-	def moveto(self, movemol = 1, point = [0., 0., 0.]):
-		# Check
-		if isinstance(vector, np.ndarray) and vector.ndim == 1 and vector.size == 3:
-			pass
-		elif isinstance(vector, (tuple, list)) and len(vector) == 3 and all([isinstance(v, (int, float)) for v in vector]):
-			vector = np.array(vector)
-		else:
-			raise TypeError("Get wrong parameters. \"point\" should be able to convert to a 1*3 matrix.")
-		if movemol not in self.mols.keys():
-			raise ValueError("Can not find target molecule in the file provided.")
-		# Move target molecule to destination
-		# The molecule goes to where its center overlap the point
-		center = np.average(self.mols.get(movemol).get("coordinate").transpose(), axis=1)
-		self.mols.get(movemol).update({"coordinate":self.mols.get(movemol).get("coordinate")+vector-center})
-	def orrient(self, movemol = 1, vector = [1., 1., 1.]):
-		# Check
-		if isinstance(vector, np.ndarray) and vector.ndim == 1 and vector.size == 3:
-			pass
-		elif isinstance(vector, (tuple, list)) and len(vector) == 3 and all([isinstance(v, (int, float)) for v in vector]):
-			vector = np.array(vector)
-		else:
-			raise TypeError("Get wrong parameters. \"vector\" should be able to convert to a 1*3 matrix.")
-		if all([v == 0 for v in vector]):
-			raise ValueError("Get wrong parameters. \"vector\" should not be a zero vector.")
-		if movemol not in self.mols.keys():
-			raise ValueError("Can not find target molecule in the file provided.")
-		# Normalize
-		vector = vector/math.sqrt(vector.dot(vector))
-		# Coordinate matrix of target molecule
-		molcoord = self.mols.get(movemol).get("coordinate")
-		center = np.average(molcoord.transpose(), axis=1)
-		# Get the normal vector determined by molecular coordinates
-		plps = fitplane([v for v in molcoord])
-		normal = np.array(plps[0:3])
-		# Rotation axis
-		axis = np.cross(normal, vector)
-		# Rotation angle
-		cosang = normal.dot(vector)/math.sqrt(normal.dot(normal)*vector.dot(vector))
-		sinang = math.sqrt(1-cosang**2)
-		# Rotate
-		newcoord = []
-		for i in range(len(molcoord)):
-			newcoord.append(rotate(molcoord[i]-center, axis, cosang, sinang) + center)
-		self.mols.get(movemol).update({"coordinate":np.array(newcoord)})
 def atomatrix2pdb(self, atoms, pdbpath, writevelo = False):
 	# Start counting
 	atomn, moln = 0, 0
@@ -610,72 +520,6 @@ def fitplane(pts):
             return a, b, c, d
     else:
         raise ValueError("Unsupported parameter given for plane function in function fitplane from module gromacs.")
-
-def hbondlist(prof, molA, molB):
-	def mol_hbondlist(moltype):
-		# Attention: atom ids in each list should start from 0, not 1
-		if moltype == "BCD":
-			donlist = [(0, 1), (4, 5), (10, 11), (19, 20), (22, 23), (25, 26), (33, 34), (36, 37), (39, 40), (47, 48), (50, 51), (53, 54), (61, 62), (64, 65), (67, 68), (75, 76), (78, 79), (81, 82), (87, 88), (90, 91), (96, 97)]
-			acclist = [0, 4, 7, 10, 12, 14, 17, 19, 22, 25, 28, 31, 33, 36, 39, 42, 45, 47, 50, 53, 56, 59, 61, 64, 67, 70, 73, 75, 78, 81, 84, 87, 90, 93, 96]
-		elif moltype == "C8A":
-			donlist = [(2, 11)]
-			acclist = [0, 2]
-		elif moltype == "C8O":
-			donlist = [(8, 9)]
-			acclist = [8]
-		elif moltype == "C8N":
-			donlist = [(8, 9), (8, 10)]
-			acclist = [8]
-		elif moltype == "QAC":
-			donlist = []
-			acclist = []
-		elif moltype == "NO3":
-			donlist = []
-			acclist = [1, 2, 3]
-		elif moltype == "SOL":
-			donlist = [(0, 1), (0, 2)]
-			acclist = [0]
-		else:
-			raise ValueError("Molecular type %s has no corresponding data term. Please check the original code and append data record to function hbondlist." % moltype)
-		return donlist, acclist
-	mola = prof.get(molA)
-	molb = prof.get(molB)
-	# Lists of donor and acceptor atom ids
-	donlista, acclista = mol_hbondlist(mola.get("name"))
-	donlistb, acclistb = mol_hbondlist(molb.get("name"))
-	# Count total hbond number between molA and molB
-	hbondn = 0
-	for (a, h) in donlista:
-		for b in acclistb:
-			# Detail(mol id + mol name + atom name)
-			don = '{0:>5}'.format(molA) + " " + '{0:>4}'.format(mola.get("name") + " " + '{0:>4}'.format(mola.get("atom")[a]))
-			hyd = '{0:>5}'.format(molA) + " " + '{0:>4}'.format(mola.get("name") + " " + '{0:>4}'.format(mola.get("atom")[h]))
-			acc = '{0:>5}'.format(molB) + " " + '{0:>4}'.format(molb.get("name") + " " + '{0:>4}'.format(molb.get("atom")[b]))
-			# Coordinate
-			donor = mola.get("coordinate")[a]
-			hydro = mola.get("coordinate")[h]
-			acceptor = molb.get("coordinate")[b]
-			dist = math.sqrt(np.dot(donor-acceptor, donor-acceptor))
-			ang = math.degrees(math.acos(np.dot(hydro-donor, acceptor-donor)/math.sqrt(np.dot(hydro-donor, hydro-donor)*np.dot(acceptor-donor, acceptor-donor))))
-			if dist < distance and ang < angle:
-				hbondn += 1
-				print(don + " | " + hyd + " | " + acc + " | " + '{0:>9.3f}'.format(dist) + " | " + '{0:>6.1f}'.format(ang))
-	for b in acclista:
-		for (a,h) in donlistb:
-			# Detail(mol id + mol name + atom name)
-			don = '{0:>5}'.format(molB) + " " + '{0:>4}'.format(molb.get("name") + " " + '{0:>4}'.format(molb.get("atom")[a]))
-			hyd = '{0:>5}'.format(molB) + " " + '{0:>4}'.format(molb.get("name") + " " + '{0:>4}'.format(molb.get("atom")[h]))
-			acc = '{0:>5}'.format(molA) + " " + '{0:>4}'.format(mola.get("name") + " " + '{0:>4}'.format(mola.get("atom")[b]))
-			# Coordinate
-			donor = molb.get("coordinate")[a]
-			hydro = molb.get("coordinate")[h]
-			acceptor = mola.get("coordinate")[b]
-			dist = math.sqrt(np.dot(donor-acceptor, donor-acceptor))
-			ang = math.degrees(math.acos(np.dot(hydro-donor, acceptor-donor)/math.sqrt(np.dot(hydro-donor, hydro-donor)*np.dot(acceptor-donor, acceptor-donor))))
-			if dist < distance and ang < angle:
-				hbondn += 1
-				print(don + " | " + hyd + " | " + acc + " | " + '{0:>9.3f}'.format(dist) + " | " + '{0:>6.1f}'.format(ang))
-	return hbondn
 # Function hbond only judge whether a hydrogen bond exists with these three coordinates
 def hbond(donor, hydro, acceptor, distance = 0.35, angle = 30):
 	if not isinstance(distance, float) and not isinstance(angle, (int, float)) and distance > 0 and 0 <= angle <= 180:
@@ -690,6 +534,7 @@ def hbond(donor, hydro, acceptor, distance = 0.35, angle = 30):
 def hbondmol(molA, molB):
 	def hbondlist(moltype):
 		# Attention: atom ids in each list should start from 0, not 1
+		# Add new molecular type here when try to analysis a new system
 		if moltype == "BCD":
 			donlist = [(0, 1), (4, 5), (10, 11), (19, 20), (22, 23), (25, 26), (33, 34), (36, 37), (39, 40), (47, 48), (50, 51), (53, 54), (61, 62), (64, 65), (67, 68), (75, 76), (78, 79), (81, 82), (87, 88), (90, 91), (96, 97)]
 			acclist = [0, 4, 7, 10, 12, 14, 17, 19, 22, 25, 28, 31, 33, 36, 39, 42, 45, 47, 50, 53, 56, 59, 61, 64, 67, 70, 73, 75, 78, 81, 84, 87, 90, 93, 96]
@@ -755,6 +600,98 @@ def hbondmol(molA, molB):
 				ang = math.degrees(math.acos(np.dot(hydro-donor, acceptor-donor)/math.sqrt(np.dot(hydro-donor, hydro-donor)*np.dot(acceptor-donor, acceptor-donor))))
 				log.append(don + " | " + hyd + " | " + acc + " | " + '{0:>9.3f}'.format(dist) + " | " + '{0:>6.1f}'.format(ang))
 	return hbondn, log
+class Moledit(object):
+	def __init__(self, pdbfile):
+		self.mols = pdb2molmatrix(pdbfile)
+		self.command()
+	def command(self):
+		cmd = input().strip()
+		# Read commands from console
+		while cmd != "exit":
+			cmd = input().strip()
+		save_and_exit = input("Save modifications?(Y/N)").strip().upper()
+		while save_and_exit not in ("Y", "N"):
+			save_and_exit = input("Save modifications?(Y/N)").strip().upper()
+		input("Press any key to exit...")
+	def cut(self, centermol = 1, shape = "sphere", parameter = (1.0,)):
+		# Check
+		if centermol not in self.mols.keys():
+			raise ValueError("Can not find target molecule in the file provided.")
+		# Calculate coordinate of target molecular center
+		center = np.average(self.mols.get(centermol).get("coordinate").transpose(), axis=1)
+		# Cut a sphere around target molecular center
+		if shape in ["sphere"]:
+			inside, outside = [], []
+			radius = parameter[0]
+			# Scan all molecules
+			for i in range(1, len(self.mols)+1):
+				mol = self.mols.get(i)
+				molcenter = np.average(mol.get("coordinate").transpose(), axis=1)
+				# Put a molecule "inside" when its center is within the sphere
+				if np.dot(molcenter-np.array(center), molcenter-np.array(center)) < radius**2:
+					inside.update({i:mol})
+				# Or put it "outside"
+				else:
+					outside.append({i:mol})
+			return inside, outside
+		else:
+			raise ValueError("Unsupported operation name given.")
+	def move(self, movemol = 1, vector = [0., 0., 0.]):
+		# Check
+		if isinstance(vector, np.ndarray) and vector.ndim == 1 and vector.size == 3:
+			pass
+		elif isinstance(vector, (tuple, list)) and len(vector) == 3 and all([isinstance(v, (int, float)) for v in vector]):
+			vector = np.array(vector)
+		else:
+			raise TypeError("Get wrong parameters. \"vector\" should be able to convert to a 1*3 matrix.")
+		if movemol not in self.mols.keys():
+			raise ValueError("Can not find target molecule in the file provided.")
+		# Move
+		self.mols.get(movemol).update({"coordinate":self.mols.get(movemol).get("coordinate")+vector})
+	def moveto(self, movemol = 1, point = [0., 0., 0.]):
+		# Check
+		if isinstance(vector, np.ndarray) and vector.ndim == 1 and vector.size == 3:
+			pass
+		elif isinstance(vector, (tuple, list)) and len(vector) == 3 and all([isinstance(v, (int, float)) for v in vector]):
+			vector = np.array(vector)
+		else:
+			raise TypeError("Get wrong parameters. \"point\" should be able to convert to a 1*3 matrix.")
+		if movemol not in self.mols.keys():
+			raise ValueError("Can not find target molecule in the file provided.")
+		# Move target molecule to destination
+		# The molecule goes to where its center overlap the point
+		center = np.average(self.mols.get(movemol).get("coordinate").transpose(), axis=1)
+		self.mols.get(movemol).update({"coordinate":self.mols.get(movemol).get("coordinate")+vector-center})
+	def orrient(self, movemol = 1, vector = [1., 1., 1.]):
+		# Check
+		if isinstance(vector, np.ndarray) and vector.ndim == 1 and vector.size == 3:
+			pass
+		elif isinstance(vector, (tuple, list)) and len(vector) == 3 and all([isinstance(v, (int, float)) for v in vector]):
+			vector = np.array(vector)
+		else:
+			raise TypeError("Get wrong parameters. \"vector\" should be able to convert to a 1*3 matrix.")
+		if all([v == 0 for v in vector]):
+			raise ValueError("Get wrong parameters. \"vector\" should not be a zero vector.")
+		if movemol not in self.mols.keys():
+			raise ValueError("Can not find target molecule in the file provided.")
+		# Normalize
+		vector = vector/math.sqrt(vector.dot(vector))
+		# Coordinate matrix of target molecule
+		molcoord = self.mols.get(movemol).get("coordinate")
+		center = np.average(molcoord.transpose(), axis=1)
+		# Get the normal vector determined by molecular coordinates
+		plps = fitplane([v for v in molcoord])
+		normal = np.array(plps[0:3])
+		# Rotation axis
+		axis = np.cross(normal, vector)
+		# Rotation angle
+		cosang = normal.dot(vector)/math.sqrt(normal.dot(normal)*vector.dot(vector))
+		sinang = math.sqrt(1-cosang**2)
+		# Rotate
+		newcoord = []
+		for i in range(len(molcoord)):
+			newcoord.append(rotate(molcoord[i]-center, axis, cosang, sinang) + center)
+		self.mols.get(movemol).update({"coordinate":np.array(newcoord)})
 class TrajAnalysis(object):
 	def load(self, dirpath, num, name, frametype = "pdb"):
 		# Initialize
@@ -781,6 +718,7 @@ class TrajAnalysis(object):
 			self.trajcoord.append(np.vstack([mol.get("coordinate") for mol in mols.values()]))
 			print("[Info] File %s is loaded successfully." % (name + repr(i) + "." + frametype))
 	def distance(self, atomA, atomB):
+		# Check
 		if not isinstance(atomA, int) or not ((isinstance(atomB, int) or (isinstance(atomB, (tuple, list)) and all([isinstance(v, int) for v in atomB])))):
 			raise ValueError("Wrong parameters. Function distance expects the first parameter should be ID for central atom and the second one be either one ID or some IDs packed in a tuple or list for surrounding atom(s).")
 		if not (isinstance(boxpara, (tuple, list)) and len(boxpara) == 3 and all([isinstance(v, (int, float)) for v in boxpara])) or not isinstance(pbc, bool):
@@ -804,15 +742,6 @@ class TrajAnalysis(object):
 					# Original Coordinate
 					pair0 = coordA - framecoord[atomBi-1]
 					pairs = [pair0]
-					if pbc is True:
-						# Adjust Coordinate owing to periodic boundary condition(PBC)
-						pairpx = pair0 + np.array([boxpara[0], 0., 0.])
-						pairnx = pair0 - np.array([boxpara[0], 0., 0.])
-						pairpy = pair0 + np.array([0., boxpara[1], 0.])
-						pairny = pair0 - np.array([0., boxpara[1], 0.])
-						pairpz = pair0 + np.array([0., 0., boxpara[2]])
-						pairnz = pair0 - np.array([0., 0., boxpara[2]])
-						pairs.extend([pairpx, pairnx, pairpy, pairny, pairpz, pairnz])
 					findist = min([math.sqrt(x.dot(x)) for x in pairs])
 					dists.append(findist)
 				log.append('{0:>6}'.format(framen) + " | " + " | ".join(['{0:>11.3f}'.format(d) for d in dists]))
@@ -822,10 +751,12 @@ class TrajAnalysis(object):
 				pairs = [pair0]
 				findist = min([math.sqrt(x.dot(x)) for x in pairs])
 				log.append('{0:>6}'.format(framen) + " | " + '{0:>11.3f}'.format(findist))
+		# Print to screen
 		print(titleline)
 		for line in log:
 			print(line)
 	def dist2plane(self, atom, plane):
+		# Check
 		if not isinstance(atom, int) or not (isinstance(plane, (tuple, list)) and len(plane) >= 3 and all([isinstance(v, int) for v in plane])):
 			raise ValueError("Wrong parameters. Function distance expects two parameters: the former should be ID for central atom and the latter should be atom IDs in the reference plane.")
 		if not (isinstance(boxpara, (tuple, list)) and len(boxpara) == 3 and all([isinstance(v, (int, float)) for v in boxpara])) or not isinstance(pbc, bool):
@@ -848,12 +779,13 @@ class TrajAnalysis(object):
 			plnormal = np.array(plps[0:3])
 			pldist = min([abs(plnormal.dot(c) + plps[3])/(plnormal.dot(plnormal))**(1/2) for c in coords])
 			log.append('{0:>6}'.format(framen) + " | " + '{0:>8.3f}'.format(pldist))
+		# Print to screen
 		print(titleline)
 		for line in log:
 			print(line)
 	def hbondgrp(self, moltypeA, moltypeB):
 		def hbondmolgrp(prof, framecoord, moltypeA, moltypeB):
-			# cluster
+			# Grouping
 			grp = cluster(prof)
 			# Initialize log and counting
 			log = []
@@ -889,8 +821,9 @@ class TrajAnalysis(object):
 			raise ValueError("Wrong parameters. Function hbondgrp expects at least two parameters, both of them should be three-letter tags of corresponding molecules.")
 		# Format
 		frametitle = '{0:>14}'.format("donor") + " | " + '{0:>14}'.format("hydro") + " | " + '{0:>14}'.format("acceptor") + " | " + '{0:>9}'.format("distance") + " | " + '{0:>6}'.format("angle")
-		# Initialize
+		# Start counting number of frames
 		framen = 0
+		# Initialize dict
 		tothbondn = {}
 		hbonds = {}
 		for framecoord in self.trajcoord:
@@ -909,6 +842,7 @@ class TrajAnalysis(object):
 		for i in range(self.trajn):
 			print('{0:>6}'.format(i) + " | " + '{0:>6}'.format(tothbondn.get(i)))
 		return tothbondn, hbonds
+	# Extract some molecules out of one frame
 	def write(self, frameid, molid):
 		molid = list(set(molid))
 		molid.sort()
@@ -916,7 +850,7 @@ class TrajAnalysis(object):
 			molmatrix = {}
 			framecoord = self.trajcoord[frameid]
 			moln = 0
-			# Reconstruct the mol matrix
+			# Reconstruct the molecular matrix
 			for i in molid:
 				moln += 1
 				molprof = self.trajprof.get(i)
