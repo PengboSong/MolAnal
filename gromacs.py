@@ -618,7 +618,84 @@ def fitplane(pts):
             return a, b, c, d
     else:
         raise ValueError("Unsupported parameter given for plane function in function fitplane from module gromacs.")
-def hbond(mols, molA, molB, distance = 0.35, angle = 30):
+
+def hbondlist(prof, molA, molB):
+	def mol_hbondlist(moltype):
+		# Attention: atom ids in each list should start from 0, not 1
+		if moltype == "BCD":
+			donlist = [(0, 1), (4, 5), (10, 11), (19, 20), (22, 23), (25, 26), (33, 34), (36, 37), (39, 40), (47, 48), (50, 51), (53, 54), (61, 62), (64, 65), (67, 68), (75, 76), (78, 79), (81, 82), (87, 88), (90, 91), (96, 97)]
+			acclist = [0, 4, 7, 10, 12, 14, 17, 19, 22, 25, 28, 31, 33, 36, 39, 42, 45, 47, 50, 53, 56, 59, 61, 64, 67, 70, 73, 75, 78, 81, 84, 87, 90, 93, 96]
+		elif moltype == "C8A":
+			donlist = [(2, 11)]
+			acclist = [0, 2]
+		elif moltype == "C8O":
+			donlist = [(8, 9)]
+			acclist = [8]
+		elif moltype == "C8N":
+			donlist = [(8, 9), (8, 10)]
+			acclist = [8]
+		elif moltype == "QAC":
+			donlist = []
+			acclist = []
+		elif moltype == "NO3":
+			donlist = []
+			acclist = [1, 2, 3]
+		elif moltype == "SOL":
+			donlist = [(0, 1), (0, 2)]
+			acclist = [0]
+		else:
+			raise ValueError("Molecular type %s has no corresponding data term. Please check the original code and append data record to function hbondlist." % moltype)
+		return donlist, acclist
+	mola = prof.get(molA)
+	molb = prof.get(molB)
+	# Lists of donor and acceptor atom ids
+	donlista, acclista = mol_hbondlist(mola.get("name"))
+	donlistb, acclistb = mol_hbondlist(molb.get("name"))
+	# Count total hbond number between molA and molB
+	hbondn = 0
+	for (a, h) in donlista:
+		for b in acclistb:
+			# Detail(mol id + mol name + atom name)
+			don = '{0:>5}'.format(molA) + " " + '{0:>4}'.format(mola.get("name") + " " + '{0:>4}'.format(mola.get("atom")[a]))
+			hyd = '{0:>5}'.format(molA) + " " + '{0:>4}'.format(mola.get("name") + " " + '{0:>4}'.format(mola.get("atom")[h]))
+			acc = '{0:>5}'.format(molB) + " " + '{0:>4}'.format(molb.get("name") + " " + '{0:>4}'.format(molb.get("atom")[b]))
+			# Coordinate
+			donor = mola.get("coordinate")[a]
+			hydro = mola.get("coordinate")[h]
+			acceptor = molb.get("coordinate")[b]
+			dist = math.sqrt(np.dot(donor-acceptor, donor-acceptor))
+			ang = math.degrees(math.acos(np.dot(hydro-donor, acceptor-donor)/math.sqrt(np.dot(hydro-donor, hydro-donor)*np.dot(acceptor-donor, acceptor-donor))))
+			if dist < distance and ang < angle:
+				hbondn += 1
+				print(don + " | " + hyd + " | " + acc + " | " + '{0:>9.3f}'.format(dist) + " | " + '{0:>6.1f}'.format(ang))
+	for b in acclista:
+		for (a,h) in donlistb:
+			# Detail(mol id + mol name + atom name)
+			don = '{0:>5}'.format(molB) + " " + '{0:>4}'.format(molb.get("name") + " " + '{0:>4}'.format(molb.get("atom")[a]))
+			hyd = '{0:>5}'.format(molB) + " " + '{0:>4}'.format(molb.get("name") + " " + '{0:>4}'.format(molb.get("atom")[h]))
+			acc = '{0:>5}'.format(molA) + " " + '{0:>4}'.format(mola.get("name") + " " + '{0:>4}'.format(mola.get("atom")[b]))
+			# Coordinate
+			donor = molb.get("coordinate")[a]
+			hydro = molb.get("coordinate")[h]
+			acceptor = mola.get("coordinate")[b]
+			dist = math.sqrt(np.dot(donor-acceptor, donor-acceptor))
+			ang = math.degrees(math.acos(np.dot(hydro-donor, acceptor-donor)/math.sqrt(np.dot(hydro-donor, hydro-donor)*np.dot(acceptor-donor, acceptor-donor))))
+			if dist < distance and ang < angle:
+				hbondn += 1
+				print(don + " | " + hyd + " | " + acc + " | " + '{0:>9.3f}'.format(dist) + " | " + '{0:>6.1f}'.format(ang))
+	return hbondn
+# Function hbond only judge whether a hydrogen bond exists with these three coordinates
+def hbond(donor, hydro, acceptor, distance = 0.35, angle = 30):
+	if not isinstance(distance, float) and not isinstance(angle, (int, float)) and distance > 0 and 0 <= angle <= 180:
+		raise ValueError("Wrong parameters. Function hbond expects distance(nm) > 0 and 0 <= angle(degree) <= 180.")
+	dist = math.sqrt(np.dot(donor-acceptor, donor-acceptor))
+	ang = math.degrees(math.acos(np.dot(hydro-donor, acceptor-donor)/math.sqrt(np.dot(hydro-donor, hydro-donor)*np.dot(acceptor-donor, acceptor-donor))))
+	if dist < distance and ang < angle:
+		return True
+	else:
+		return False
+# Parameters molA and molB both should be pack of mol id, mol name, atom names and mol coordinate matrix
+def hbondmol(molA, molB):
 	def hbondlist(moltype):
 		# Attention: atom ids in each list should start from 0, not 1
 		if moltype == "BCD":
@@ -645,143 +722,231 @@ def hbond(mols, molA, molB, distance = 0.35, angle = 30):
 		else:
 			raise ValueError("Molecular type %s has no corresponding data term. Please check the original code and append data record to function hbondlist." % moltype)
 		return donlist, acclist
-	mola = mols.get(molA)
-	molb = mols.get(molB)
+	# Unpack molA and molB
+	mola_id, mola_name, mola_atom, mola_coord = molA
+	molb_id, molb_name, molb_atom, molb_coord = molB
 	# Lists of donor and acceptor atom ids
-	donlista, acclista = hbondlist(mola.get("name"))
-	donlistb, acclistb = hbondlist(molb.get("name"))
+	donlista, acclista = hbondlist(mola_name)
+	donlistb, acclistb = hbondlist(molb_name)
+	# Initialize log
+	log = []
 	# Count total hbond number between molA and molB
 	hbondn = 0
 	for (a, h) in donlista:
 		for b in acclistb:
-		# Detail(mol id + mol name + atom name)
-			don = '{0:>5}'.format(molA) + " " + '{0:>4}'.format(mola.get("name") + " " + '{0:>4}'.format(mola.get("atom")[a]))
-			hyd = '{0:>5}'.format(molA) + " " + '{0:>4}'.format(mola.get("name") + " " + '{0:>4}'.format(mola.get("atom")[h]))
-			acc = '{0:>5}'.format(molB) + " " + '{0:>4}'.format(molb.get("name") + " " + '{0:>4}'.format(molb.get("atom")[b]))
+			# Detail(mol id + mol name + atom name)
+			don = '{0:>5}'.format(mola_id) + " " + '{0:>4}'.format(mola_name + " " + '{0:>4}'.format(mola_atom[a]))
+			hyd = '{0:>5}'.format(mola_id) + " " + '{0:>4}'.format(mola_name + " " + '{0:>4}'.format(mola_atom[h]))
+			acc = '{0:>5}'.format(molb_id) + " " + '{0:>4}'.format(molb_name + " " + '{0:>4}'.format(molb_atom[b]))
 			# Coordinate
-			donor = mola.get("coordinate")[a]
-			hydro = mola.get("coordinate")[h]
-			acceptor = molb.get("coordinate")[b]
-			dist = math.sqrt(np.dot(donor-acceptor, donor-acceptor))
-			ang = math.degrees(math.acos(np.dot(hydro-donor, acceptor-donor)/math.sqrt(np.dot(hydro-donor, hydro-donor)*np.dot(acceptor-donor, acceptor-donor))))
-			if dist < distance and ang < angle:
+			donor = mola_coord[a]
+			hydro = mola_coord[h]
+			acceptor = molb_coord[b]
+			if hbond(donor, hydro, acceptor) is True:
 				hbondn += 1
-				print(don + " | " + hyd + " | " + acc + " | " + '{0:>9.3f}'.format(dist) + " | " + '{0:>6.1f}'.format(ang))
+				dist = math.sqrt(np.dot(donor-acceptor, donor-acceptor))
+				ang = math.degrees(math.acos(np.dot(hydro-donor, acceptor-donor)/math.sqrt(np.dot(hydro-donor, hydro-donor)*np.dot(acceptor-donor, acceptor-donor))))
+				log.append(don + " | " + hyd + " | " + acc + " | " + '{0:>9.3f}'.format(dist) + " | " + '{0:>6.1f}'.format(ang))
 	for b in acclista:
 		for (a,h) in donlistb:
-		# Detail(mol id + mol name + atom name)
-			don = '{0:>5}'.format(molB) + " " + '{0:>4}'.format(molb.get("name") + " " + '{0:>4}'.format(molb.get("atom")[a]))
-			hyd = '{0:>5}'.format(molB) + " " + '{0:>4}'.format(molb.get("name") + " " + '{0:>4}'.format(molb.get("atom")[h]))
-			acc = '{0:>5}'.format(molA) + " " + '{0:>4}'.format(mola.get("name") + " " + '{0:>4}'.format(mola.get("atom")[b]))
+			# Detail(mol id + mol name + atom name)
+			don = '{0:>5}'.format(molb_id) + " " + '{0:>4}'.format(molb_name + " " + '{0:>4}'.format(molb_atom[a]))
+			hyd = '{0:>5}'.format(molb_id) + " " + '{0:>4}'.format(molb_name + " " + '{0:>4}'.format(molb_atom[h]))
+			acc = '{0:>5}'.format(mola_id) + " " + '{0:>4}'.format(mola_name + " " + '{0:>4}'.format(mola_atom[b]))
 			# Coordinate
-			donor = molb.get("coordinate")[a]
-			hydro = molb.get("coordinate")[h]
-			acceptor = mola.get("coordinate")[b]
-			dist = math.sqrt(np.dot(donor-acceptor, donor-acceptor))
-			ang = math.degrees(math.acos(np.dot(hydro-donor, acceptor-donor)/math.sqrt(np.dot(hydro-donor, hydro-donor)*np.dot(acceptor-donor, acceptor-donor))))
-			if dist < distance and ang < angle:
+			donor = molb_coord[a]
+			hydro = molb_coord[h]
+			acceptor = mola_coord[b]
+			if hbond(donor, hydro, acceptor) is True:
 				hbondn += 1
-				print(don + " | " + hyd + " | " + acc + " | " + '{0:>9.3f}'.format(dist) + " | " + '{0:>6.1f}'.format(ang))
-	return hbondn
+				dist = math.sqrt(np.dot(donor-acceptor, donor-acceptor))
+				ang = math.degrees(math.acos(np.dot(hydro-donor, acceptor-donor)/math.sqrt(np.dot(hydro-donor, hydro-donor)*np.dot(acceptor-donor, acceptor-donor))))
+				log.append(don + " | " + hyd + " | " + acc + " | " + '{0:>9.3f}'.format(dist) + " | " + '{0:>6.1f}'.format(ang))
+	return hbondn, log
 class TrajAnalysis(object):
-	def __init__(self):
-		self.traj = []
 	def load(self, dirpath, num, name, frametype = "pdb"):
-		import json
-		for i in range(num):
-			atoms = pdb2atomatrix(os.path.join(dirpath, name + repr(i) + "." + frametype)).origin()
-			self.traj.append(atoms)
-			print("File %s has read to memory." % (name + repr(i) + "." + frametype))
-	def distance(self, atomA, atomB):
-		if isinstance(atomA, int) and (isinstance(atomB, int) or (isinstance(atomB, (tuple, list)) and all([isinstance(v, int) for v in atomB]))):
-			frame = 0
-			if isinstance(atomB, (tuple, list)):
-				print('{0:>6}'.format("frames") + " | " + " | ".join(['{0:>5}'.format(atomA) + "-" + '{0:>5}'.format(atomBi) for atomBi in atomB]))
-			else:
-				print('{0:>6}'.format("frames") + " | " + '{0:>5}'.format(atomA) + "-" + '{0:>5}'.format(atomB))
-			for atoms in self.traj:
-				frame += 1
-				if atomA in atoms.keys() and ((isinstance(atomB, int) and atomB in atoms.keys()) or (isinstance(atomB, (tuple, list)) and all([x in atoms.keys() for x in atomB]))):
-					coordA = atoms.get(atomA).get("coordinate")
-					if isinstance(atomB, (tuple, list)):
-						dists = []
-						for atomBi in atomB:
-							pair = coordA - atoms.get(atomBi).get("coordinate")
-							dists.append(math.sqrt(np.dot(pair, pair)))
-						print('{0:>6}'.format(frame) + " | " + " | ".join(['{0:>11.3f}'.format(d) for d in dists]))
-					else:
-						pair = coordA - atoms.get(atomB).get("coordinate")
-						print('{0:>6}'.format(frame) + " | " + '{0:>11.3f}'.format(math.sqrt(np.dot(pair, pair))))
-				else:
-					raise ValueError("Can not find pair atom(s) in the atom matrix provided.")
-		else:
-			raise ValueError("Wrong parameters. Function distance expects two parameters: the former should be ID for central atom and the latter should be either one ID or some IDs packed in a tuple or list for surrounding atom(s).")
-	def dist2plane(self, atom, plane):
-		import numpy as np
-		if isinstance(atom, int) and isinstance(plane, (tuple, list)) and len(plane) >= 3 and all([isinstance(v, int) for v in plane]):
-			frame = 0
-			print('{0:>6}'.format("frames") + " | " + '{0:>8}'.format("distance"))
-			for atoms in self.traj:
-				frame += 1
-				if atom in atoms.keys() and all([x in atoms.keys() for x in plane]):
-					coord = atoms.get(atom).get("coordinate")
-					# Function fitplane only accepts a package of at least three points' coordinate (better near a plane) in the form of either tuple or list, each element of the package should be a 1-dim 3-size numpy.ndarray object
-					plps = fitplane([atoms.get(x).get("coordinate") for x in plane])	# Short of plane parameters
-					# Attention: plps should be a tuple with 4 elements, denoted as a, b, c, d. The plane equation should be ax+by+cz=0
-					plnormal = np.array(plps[0:3])
-					pldist = abs(plnormal.dot(coord) + plps[3])/(plnormal.dot(plnormal))**(1/2)
-					print('{0:>6}'.format(frame) + " | " + '{0:>8.3f}'.format(pldist))
-		else:
-			raise ValueError("Wrong parameters. Function distance expects two parameters: the former should be ID for central atom and the latter should be atom IDs in the reference plane.")
-class TrajAnalysisMol(object):
-	def __init__(self):
-		self.trajmol = []
-	def load(self, dirpath, num, name, frametype = "pdb"):
-		import json
+		# Initialize
+		self.trajprof = {}
+		self.trajcoord = []
+		self.trajn = num
+		# Load trajectory profile from the first frame(should end with number 0)
+		firstframe = pdb2molmatrix(os.path.join(dirpath, name + "0" + "." + frametype)).origin()
+		# Remove coordinate and velocity terms
+		# Add atom id term for each atom, begin counting
+		# Atom ids would be count from 1
+		atomn = 1
+		for molid in firstframe.keys():
+			mol = firstframe.get(molid)
+			mol_atomn = len(mol.get("atom"))
+			molprof = {"name":mol.get("name"), "atom":mol.get("atom"), "atomid":[atomn+i for i in range(mol_atomn)]}
+			atomn += mol_atomn
+			self.trajprof.update({molid:molprof})
+		# atomn equals to total counting of atoms plus initial 1
+		self.atomn = atomn - 1
+		# Only load coordinates data of each frame (including the first one) into a matrix (N*3)
 		for i in range(num):
 			mols = pdb2molmatrix(os.path.join(dirpath, name + repr(i) + "." + frametype)).origin()
-			self.trajmol.append(mols)
-			print("File %s has read to memory." % (name + repr(i) + "." + frametype))
-	def hbondgrp(self, moltypeA, moltypeB, distance = 0.35, angle = 30):
-		print('{0:>14}'.format("donor") + " | " + '{0:>14}'.format("hydro") + " | " + '{0:>14}'.format("acceptor") + " | " + '{0:>9}'.format("distance") + " | " + '{0:>6}'.format("angle"))
+			self.trajcoord.append(np.vstack([mol.get("coordinate") for mol in mols.values()]))
+			print("[Info] File %s is loaded successfully." % (name + repr(i) + "." + frametype))
+	def distance(self, atomA, atomB, boxpara = (10., 10., 10.), pbc = True):
+		if not isinstance(atomA, int) or not ((isinstance(atomB, int) or (isinstance(atomB, (tuple, list)) and all([isinstance(v, int) for v in atomB])))):
+			raise ValueError("Wrong parameters. Function distance expects the first parameter should be ID for central atom and the second one be either one ID or some IDs packed in a tuple or list for surrounding atom(s).")
+		if not (isinstance(boxpara, (tuple, list)) and len(boxpara) == 3 and all([isinstance(v, (int, float)) for v in boxpara])) or not isinstance(pbc, bool):
+			raise ValueError("Wrong parameters. Function distance expects default parameter boxpara be a tuple os list with three number each be parameter of box in one dimension.")
+		if atomA > self.atomn or not (((isinstance(atomB, int) and atomB <= self.atomn) or (isinstance(atomB, (tuple, list)) and all([x <= self.atomn for x in atomB])))):
+			raise ValueError("Can not find pair atom(s) in the matrix provided.")
+		# Format
+		if isinstance(atomB, (tuple, list)):
+			titleline = '{0:>6}'.format("frames") + " | " + " | ".join(['{0:>5}'.format(atomA) + "-" + '{0:>5}'.format(atomBi) for atomBi in atomB])
+		else:
+			titleline = '{0:>6}'.format("frames") + " | " + '{0:>5}'.format(atomA) + "-" + '{0:>5}'.format(atomB)
+		# Initialize log and counting
+		log = []
 		framen = -1
-		allhbondn, allhbonds = {}, {}
-		for frame in self.trajmol:
+		for framecoord in self.trajcoord:
 			framen += 1
-			tothbondn = 0
-			tothbonds = []
-			grp = cluster(frame)
-			print("<frame %d>" % framen)
-			if not isinstance(distance, float) and not isinstance(angle, (int, float)) and distance > 0 and 0 <= angle <= 180:
-				raise ValueError("Wrong parameters. Function hbondgrp expects distance(nm) > 0 and 0 <= angle(degree) <= 180.")
-			if moltypeA in grp.keys() and moltypeB in grp.keys():
-				for molA in grp.get(moltypeA):
-					for molB in grp.get(moltypeB):
-						hbondn = hbond(frame, molA, molB, distance, angle)
-						tothbondn += hbondn
-						if hbondn > 0:
-							tothbonds.append(molA)
-							tothbonds.append(molB)
-				tothbonds = list(set(tothbonds))
-				tothbonds.sort()
-				allhbondn.update({framen:tothbondn})
-				allhbonds.update({framen:tothbonds})
+			coordA = framecoord[atomA-1]
+			if isinstance(atomB, (tuple, list)):
+				dists = []
+				for atomBi in atomB:
+					# Original Coordinate
+					pair0 = coordA - framecoord[atomBi-1]
+					pairs = [pair0]
+					if pbc is True:
+						# Adjust Coordinate owing to periodic boundary condition(PBC)
+						pairpx = pair0 + np.array([boxpara[0], 0., 0.])
+						pairnx = pair0 - np.array([boxpara[0], 0., 0.])
+						pairpy = pair0 + np.array([0., boxpara[1], 0.])
+						pairny = pair0 - np.array([0., boxpara[1], 0.])
+						pairpz = pair0 + np.array([0., 0., boxpara[2]])
+						pairnz = pair0 - np.array([0., 0., boxpara[2]])
+						pairs.extend([pairpx, pairnx, pairpy, pairny, pairpz, pairnz])
+					findist = min([math.sqrt(x.dot(x)) for x in pairs])
+					dists.append(findist)
+				log.append('{0:>6}'.format(framen) + " | " + " | ".join(['{0:>11.3f}'.format(d) for d in dists]))
 			else:
-				raise ValueError("Wrong parameters. Function hbondgrp expects at least two parameters, both of them should be three-letter tags of corresponding molecules.")
+				# Original Coordinate
+				pair0 = coordA - framecoord[atomBi-1]
+				pairs = [pair0]
+				if pbc is True:
+					# Adjust Coordinate owing to periodic boundary condition(PBC)
+					pairpx = pair0 + np.array([boxpara[0], 0., 0.])
+					pairnx = pair0 - np.array([boxpara[0], 0., 0.])
+					pairpy = pair0 + np.array([0., boxpara[1], 0.])
+					pairny = pair0 - np.array([0., boxpara[1], 0.])
+					pairpz = pair0 + np.array([0., 0., boxpara[2]])
+					pairnz = pair0 - np.array([0., 0., boxpara[2]])
+					pairs.extend([pairpx, pairnx, pairpy, pairny, pairpz, pairnz])
+				findist = min([math.sqrt(x.dot(x)) for x in pairs])
+				log.append('{0:>6}'.format(framen) + " | " + '{0:>11.3f}'.format(findist))
+		print(titleline)
+		for line in log:
+			print(line)
+	def dist2plane(self, atom, plane, boxpara = (10., 10., 10.), pbc = True):
+		if not isinstance(atom, int) or not (isinstance(plane, (tuple, list)) and len(plane) >= 3 and all([isinstance(v, int) for v in plane])):
+			raise ValueError("Wrong parameters. Function distance expects two parameters: the former should be ID for central atom and the latter should be atom IDs in the reference plane.")
+		if not (isinstance(boxpara, (tuple, list)) and len(boxpara) == 3 and all([isinstance(v, (int, float)) for v in boxpara])) or not isinstance(pbc, bool):
+			raise ValueError("Wrong parameters. Function distance expects default parameter boxpara be a tuple os list with three number each be parameter of box in one dimension.")
+		if atom > self.atomn or all([x <= self.atomn for x in plane]) is False:
+			raise ValueError("Can not find atom(s) in the matrix provided.")
+		# Format
+		titleline = '{0:>6}'.format("frames") + " | " + '{0:>8}'.format("distance")
+		# Initialize log and counting
+		log = []
+		framen = 0
+		for framecoord in self.trajcoord:
+			framen += 1
+			# Original Coordinate
+			coord = framecoord[atom-1]
+			coords= [coord]
+			# Function fitplane only accepts a package of at least three points' coordinate (better near a plane) in the form of either tuple or list, each element of the package should be a 1-dim 3-size numpy.ndarray object
+			plps = fitplane([framecoord[x-1] for x in plane])	# Short of plane parameters
+			# Attention: plps should be a tuple with 4 elements, denoted as a, b, c, d. The plane equation should be ax+by+cz=0
+			plnormal = np.array(plps[0:3])
+			if pbc is True:
+				coords.append(coord + np.array([boxpara[0], 0., 0.]))
+				coords.append(coord - np.array([boxpara[0], 0., 0.]))
+				coords.append(coord + np.array([0., boxpara[1], 0.]))
+				coords.append(coord - np.array([0., boxpara[1], 0.]))
+				coords.append(coord + np.array([0., 0., boxpara[2]]))
+				coords.append(coord - np.array([0., 0., boxpara[2]]))
+			pldist = min([abs(plnormal.dot(c) + plps[3])/(plnormal.dot(plnormal))**(1/2) for c in coords])
+			log.append('{0:>6}'.format(framen) + " | " + '{0:>8.3f}'.format(pldist))
+		print(titleline)
+		for line in log:
+			print(line)
+	def hbondgrp(self, moltypeA, moltypeB):
+		def hbondmolgrp(prof, framecoord, moltypeA, moltypeB):
+			# cluster
+			grp = cluster(prof)
+			# Initialize log and counting
+			log = []
+			hbondn = []
+			molids = []
+			for mola_id in grp.get(moltypeA):
+				for molb_id in grp.get(moltypeB):
+					mola = prof.get(mola_id)
+					molA = (
+						mola_id,
+						mola.get("name"),
+						mola.get("atom"),
+						np.vstack([framecoord[l-1] for l in mola.get("atomid")])
+					)
+					molb = prof.get(molb_id)
+					molB = (
+						molb_id,
+						molb.get("name"),
+						molb.get("atom"),
+						np.vstack([framecoord[l-1] for l in molb.get("atomid")])
+					)
+					mol_hbondn, mol_log = hbondmol(molA, molB)
+					hbondn.append(mol_hbondn)
+					log.extend(mol_log)
+					if mol_hbondn > 0:
+						molids.extend([mola_id, molb_id])
+			molids = list(set(molids))
+			molids.sort()
+			return hbondn, log, molids
+		# Check
+		profgrp = cluster(self.trajprof)
+		if moltypeA not in profgrp.keys() or moltypeB not in profgrp.keys():
+			raise ValueError("Wrong parameters. Function hbondgrp expects at least two parameters, both of them should be three-letter tags of corresponding molecules.")
+		# Format
+		frametitle = '{0:>14}'.format("donor") + " | " + '{0:>14}'.format("hydro") + " | " + '{0:>14}'.format("acceptor") + " | " + '{0:>9}'.format("distance") + " | " + '{0:>6}'.format("angle")
+		# Initialize
+		framen = 0
+		tothbondn = {}
+		hbonds = {}
+		for framecoord in self.trajcoord:
+			hbondn, log, molids = hbondmolgrp(self.trajprof, framecoord, moltypeA, moltypeB)
+			frame_hbondn = sum(hbondn)
+			if frame_hbondn > 0:
+				print("<frame %d>" % framen)
+				print(frametitle)
+				for line in log:
+					print(line)
+			tothbondn.update({framen:frame_hbondn})
+			hbonds.update({framen:molids})
+			# Counting of frames start from 0
+			framen += 1
 		print('{0:>6}'.format("frame") + " | " + '{0:>6}'.format("hbondn"))
-		for i in range(len(allhbondn)):
-			print('{0:>6}'.format(i) + " | " + '{0:>6}'.format(allhbondn.get(i)))
-		return allhbondn, allhbonds
+		for i in range(self.trajn):
+			print('{0:>6}'.format(i) + " | " + '{0:>6}'.format(tothbondn.get(i)))
+		return tothbondn, hbonds
 	def write(self, frameid, molid):
 		molid = list(set(molid))
 		molid.sort()
-		if isinstance(frameid, int) and frameid < len(self.trajmol) and ((isinstance(molid, int) and molid in self.trajmol[frameid].keys()) or (isinstance(molid, (tuple, list)) and all([v in self.trajmol[frameid].keys() for v in molid]))):
+		if isinstance(frameid, int) and frameid < self.trajn and ((isinstance(molid, int) and molid in self.trajprof.keys()) or (isinstance(molid, (tuple, list)) and all([v in self.trajprof.keys() for v in molid]))):
 			molmatrix = {}
-			frame = self.trajmol[frameid]
+			framecoord = self.trajcoord[frameid]
 			moln = 0
+			# Reconstruct the mol matrix
 			for i in molid:
 				moln += 1
-				molmatrix.update({moln:frame.get(i)})
+				molprof = self.trajprof.get(i)
+				mol = {"name":molprof.get("name"), "atom":molprof.get("atom")}
+				mol.update({"coordinate":np.vstack([framecoord[l-1] for l in molprof.get("atomid")])})
+				molmatrix.update({moln:mol})
 			molmatrix2pdb(molmatrix).write("newframe%d.pdb" %frameid)
 		else:
 			raise ValueError("Wrong parameters. Function write expects two parameters, the former should be id for the frame and the latter should be either an id for the molecular matrix or a tuple or list for several ids.")
