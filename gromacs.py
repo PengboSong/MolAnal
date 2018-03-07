@@ -308,71 +308,98 @@ class pdb2atomatrix(object):
 				else:
 					outside.update({i:self.atoms.get(i)})
 			return inside, outside
-class pdb2molmatrix(object):
-	def __init__(self, pdbpath, maxsize = 209715200):
-		self.mols = {}
-		with open(pdbpath, 'r') as f:
-			rown = 0
-			former = (0,"")
-			if os.path.splitext(pdbpath)[1] == ".pdb":
-				title = ""
-				atomn = 0
-				for line in f.readlines(maxsize):
-					if line[0:6] in ("ATOM  ", "HETATM"):
-						line_data = readline_pdb(line, rown)
-						if not former[0] and not former[1]:
-							mol_id = line_data.get("residue_sequence_number")
-							mol_name = line_data.get("residual_name")
-							mol_matrix = {"name":mol_name}
-							atom, coordinate, velocity = [], [], []
-						elif former[0] != line_data.get("residue_sequence_number") or former[1] != line_data.get("residual_name"):
-							mol_matrix.update({"atom":atom, "coordinate":np.array(coordinate), "velocity":np.array(velocity)})
-							self.mols.update({mol_id:mol_matrix})
-							mol_id = line_data.get("residue_sequence_number")
-							mol_name = line_data.get("residual_name")
-							mol_matrix = {"name":mol_name}
-							atom, coordinate, velocity = [], [], []
-						atom.append(line_data.get("atom_name"))
-						coordinate.append([line_data.get("coordinate_x")/10, line_data.get("coordinate_y")/10, line_data.get("coordinate_z")/10])
-						velocity = [[0., 0., 0.]]
-						former = (line_data.get("residue_sequence_number"), line_data.get("residual_name"))
-				# Complete the last mal matrix
-				mol_matrix.update({"atom":atom, "coordinate":np.array(coordinate), "velocity":np.array(velocity)})
-				self.mols.update({mol_id:mol_matrix})
-			elif os.path.splitext(pdbpath)[1] == ".gro":
+def pdb2molmatrix(pdbpath, maxsize = 209715200):
+	# Initialize molecular matrix dict
+	mols = {}
+	# Read input file
+	with open(pdbpath, 'r') as f:
+		# Start counting number of lines
+		rown = 0
+		former = (0,"")
+		# pdb file
+		if os.path.splitext(pdbpath)[1] == ".pdb":
+			title = ""
+			atomn = 0
+			for line in f.readlines(maxsize):
+				if line[0:6] in ("ATOM  ", "HETATM"):
+					line_data = readline_pdb(line, rown)
+					# First molecule
+					if not former[0] and not former[1]:
+						mol_id = line_data.get("residue_sequence_number")
+						mol_name = line_data.get("residual_name")
+						mol_matrix = {"name":mol_name}
+						atom, coordinate, velocity = [], [], []
+					# Start a new molecule
+					elif former[0] != line_data.get("residue_sequence_number") or former[1] != line_data.get("residual_name"):
+						mol_matrix.update({"atom":atom, "coordinate":np.array(coordinate), "velocity":np.array(velocity)})
+						mols.update({mol_id:mol_matrix})
+						mol_id = line_data.get("residue_sequence_number")
+						mol_name = line_data.get("residual_name")
+						mol_matrix = {"name":mol_name}
+						atom, coordinate, velocity = [], [], []
+					# Common lines
+					atom.append(line_data.get("atom_name"))
+					coordinate.append([line_data.get("coordinate_x")/10, line_data.get("coordinate_y")/10, line_data.get("coordinate_z")/10])
+					# No velocity data in pdb file
+					velocity = [[0., 0., 0.]]
+					former = (line_data.get("residue_sequence_number"), line_data.get("residual_name"))
+			# Complete the last molecular matrix
+			mol_matrix.update({"atom":atom, "coordinate":np.array(coordinate), "velocity":np.array(velocity)})
+			mols.update({mol_id:mol_matrix})
+		# gro file
+		elif os.path.splitext(pdbpath)[1] == ".gro":
+			# Start counting and read first two lines
+			rown += 1
+			title = f.readline().strip()
+			rown += 1
+			atomn = f.readline().strip()
+			# Second line should be an integer equals to total atom numbers
+			try:
+				atomn = int(atomn)
+			except Exception as e:
+				raise ValueError("Incorrect gromacs file format. Please check file at path %s." % pdbpath)
+			for line in f.readlines(maxsize):
 				rown += 1
-				title = f.readline().strip()
-				rown += 1
-				atomn = f.readline().strip()
-				try:
-					atomn = int(atomn)
-				except Exception as e:
-					raise ValueError("Incorrect gromacs file format. Please check file at path %s." % pdbpath)
-				for line in f.readlines(maxsize):
-					rown += 1
-					if rown < atomn + 3:
-						line_data = readline_gro(line, rown)
-						if not former[0] and not former[1]:
-							mol_id = line_data.get("mol_id")
-							mol_name = line_data.get("mol_name")
-							mol_matrix = {"name":mol_name}
-							atom, coordinate, velocity = [], [], []
-						elif former[0] != line_data.get("mol_id") or former[1] != line_data.get("mol_name"):
-							mol_matrix.update({"atom":atom, "coordinate":np.array(coordinate), "velocity":np.array(velocity)})
-							self.mols.update({mol_id:mol_matrix})
-							mol_id = line_data.get("mol_id")
-							mol_name = line_data.get("mol_name")
-							mol_matrix = {"name":mol_name}
-							atom, coordinate, velocity = [], [], []
-						atom.append(line_data.get("atom_name"))
-						coordinate.append([line_data.get("x"), line_data.get("y"), line_data.get("z")])
-						velocity.append([line_data.get("vx"), line_data.get("vy"), line_data.get("vz")])
-						former = (line_data.get("mol_id"), line_data.get("mol_name"))
-				# Complete the last mal matrix
-				mol_matrix.update({"atom":atom, "coordinate":np.array(coordinate), "velocity":np.array(velocity)})
-				self.mols.update({mol_id:mol_matrix})
-	def origin(self):
-		return self.mols
+				# Line 'atomn + 3' should be solvate box parameters
+				if rown < atomn + 3:
+					line_data = readline_gro(line, rown)
+					# First molecule
+					if not former[0] and not former[1]:
+						mol_id = line_data.get("mol_id")
+						mol_name = line_data.get("mol_name")
+						mol_matrix = {"name":mol_name}
+						atom, coordinate, velocity = [], [], []
+					# Start a new molecule
+					elif former[0] != line_data.get("mol_id") or former[1] != line_data.get("mol_name"):
+						mol_matrix.update({"atom":atom, "coordinate":np.array(coordinate), "velocity":np.array(velocity)})
+						mols.update({mol_id:mol_matrix})
+						mol_id = line_data.get("mol_id")
+						mol_name = line_data.get("mol_name")
+						mol_matrix = {"name":mol_name}
+						atom, coordinate, velocity = [], [], []
+					# Common lines
+					atom.append(line_data.get("atom_name"))
+					coordinate.append([line_data.get("x"), line_data.get("y"), line_data.get("z")])
+					velocity.append([line_data.get("vx"), line_data.get("vy"), line_data.get("vz")])
+					former = (line_data.get("mol_id"), line_data.get("mol_name"))
+			# Complete the last molecular matrix
+			mol_matrix.update({"atom":atom, "coordinate":np.array(coordinate), "velocity":np.array(velocity)})
+			mols.update({mol_id:mol_matrix})
+		else:
+			raise ValueError("Can not load file that does not end with \"pdb\" or \"gro\".")
+	return mols
+class Moledit(object):
+	def __init__(self, pdbfile):
+		self.mols = pdb2molmatrix(pdbfile)
+		self.command()
+	def command(self):
+		cmd = input().strip()
+		while cmd != "exit":
+			cmd = input().strip()
+		save_and_exit = input("Save modifications?(Y/N)").strip().upper()
+		while save_and_exit not in ("Y", "N"):
+			save_and_exit = input("Save modifications?(Y/N)").strip().upper()
+		input("Press any key to exit...")
 	def cut(self, centermol = 1, shape = "sphere", parameter = (1.0,)):
 		# Check
 		if centermol not in self.mols.keys():
@@ -452,85 +479,102 @@ class pdb2molmatrix(object):
 		for i in range(len(molcoord)):
 			newcoord.append(rotate(molcoord[i]-center, axis, cosang, sinang) + center)
 		self.mols.get(movemol).update({"coordinate":np.array(newcoord)})
-class atomatrix2pdb(object):
-	def __init__(self, matrix):
-		self.atoms = matrix
-	def write(self, pdbpath, writevelo = False):
-		atomn, moln = 0, 0
-		atoms = []
-		xbox, ybox, zbox = boxpara(np.vstack([atom.get("coordinate") for atom in self.atoms.values()]))
-		if os.path.splitext(pdbpath)[1] == ".gro":
-			for j in range(1, len(self.atoms)+1):
+def atomatrix2pdb(self, atoms, pdbpath, writevelo = False):
+	# Start counting
+	atomn, moln = 0, 0
+	watoms = []
+	# Get the solvate box size
+	xbox, ybox, zbox = boxpara(np.vstack([atom.get("coordinate") for atom in self.atoms.values()]))
+	# Write gro file
+	if os.path.splitext(pdbpath)[1] == ".gro":
+		for j in range(1, len(atoms)+1):
+			atomn += 1
+			atom = atoms.get(j)
+			atomtype = atom.get("name")
+			molid = atom.get("resid")
+			moltype = atom.get("resname")
+			coordinate = atom.get("coordinate")
+			velocity = atom.get("velocity")
+			# New molecule
+			if j == 1 or (j > 1 and (moltype != atoms.get(j-1).get("resname") or molid != atoms.get(j-1).get("resid"))):
+				moln += 1
+			if writevelo is True:
+				# Need completion
+				watoms.append()
+			else:
+				# Need completion
+				watoms.append()
+		with open(pdbpath, "w") as f:
+			# Default title
+			f.write("GROtesk MACabre and Sinister" + '\n')
+			# Atom numbers
+			f.write('{0:>5}'.format(atomn) + '\n')
+			f.writelines(line + '\n' for line in watoms)
+			# Solvate box parameters
+			f.write('{0:>10.5f}'.format(xbox) + '{0:>10.5f}'.format(ybox) + '{0:>10.5f}'.format(zbox) + '\n')
+	# Write pdb file
+	elif os.path.splitext(pdbpath)[1] == ".pdb":
+		# Need completion
+		pass
+	else:
+		raise ValueError("Can not write file that does not end with \"pdb\" or \"gro\".")
+def molmatrix2pdb(self, mols, pdbpath, writevelo = False):
+	# Start counting
+	atomn, moln = 0, 0
+	watoms = []
+	# Get the solvate box size
+	xbox, ybox, zbox = boxpara(np.vstack([mol.get("coordinate") for mol in mols.values()]))
+	# Write gro file
+	if os.path.splitext(pdbpath)[1] == ".gro":
+		for j in range(1, len(mols)+1):
+			moln += 1
+			mol = mols.get(j)
+			molid = mol.get("id")
+			moltype = mol.get("name")
+			atom = mol.get("atom")
+			coordinate = mol.get("coordinate")
+			velocity = mol.get("velocity")
+			for i in range(len(atom)):
 				atomn += 1
-				atom = self.atoms.get(j)
-				atomtype = atom.get("name")
-				molid = atom.get("resid")
-				moltype = atom.get("resname")
-				coordinate = atom.get("coordinate")
-				velocity = atom.get("velocity")
-				if j == 1 or (j > 1 and (moltype != self.atoms.get(j-1).get("resname") or molid != self.atoms.get(j-1).get("resid"))):
-					moln += 1
+				# Write velocity
 				if writevelo is True:
-					# Need completion
-					atoms.append()
+					watoms.append('{0:>5}'.format(moln) + '{0:<4}'.format(moltype) + " "*2 +'{0:>4}'.format(atom[i]) + '{0:>5}'.format(atomn) + '{0:>8.3f}'.format(coordinate[i][0]) + '{0:>8.3f}'.format(coordinate[i][1]) + '{0:>8.3f}'.format(coordinate[i][2]) + '{0:>8.3f}'.format(velocity[i][0]) + '{0:>8.3f}'.format(velocity[i][1]) + '{0:>8.3f}'.format(velocity[i][2]))
+				# No velocity information
 				else:
-					# Need completion
-					atoms.append()
+					watoms.append('{0:>5}'.format(moln) + '{0:<4}'.format(moltype) + " "*2 +'{0:>4}'.format(atom[i]) + '{0:>5}'.format(atomn) + '{0:>8.3f}'.format(coordinate[i][0]) + '{0:>8.3f}'.format(coordinate[i][1]) + '{0:>8.3f}'.format(coordinate[i][2]))
+		with open(pdbpath, "w") as f:
+			# Default title
+			f.write("GROtesk MACabre and Sinister" + '\n')
+			# Atom numbers
+			f.write('{0:>5}'.format(atomn) + '\n')
+			f.writelines(line + '\n' for line in watoms)
+			# Solvate box parameters
+			f.write('{0:>10.5f}'.format(xbox) + '{0:>10.5f}'.format(ybox) + '{0:>10.5f}'.format(zbox) + '\n')
+	# Write pdb file
+	elif os.path.splitext(pdbpath)[1] == ".pdb":
+		for j in range(1, len(mols)+1):
+			moln += 1
+			mol = mols.get(j)
+			molid = mol.get("id")
+			moltype = mol.get("name")
+			atom = mol.get("atom")
+			coordinate = mol.get("coordinate")
+			for i in range(len(atom)):
+				atomn += 1
+				watoms.append('{0:<6}'.format("HETATM") + '{0:>5}'.format(atomn) + " " + '{0:<4}'.format(atom[i]) + " " + '{0:>3}'.format(moltype) + " "*2 + '{0:>4}'.format(moln) + " "*4 + '{0:>8.3f}'.format(coordinate[i][0]*10) + '{0:>8.3f}'.format(coordinate[i][1]*10) + '{0:>8.3f}'.format(coordinate[i][2]*10) + '{0:>6.2f}'.format(1) + '{0:>6.2f}'.format(0) + " "*10 + '{0:>3}'.format(atom[i][0]))
 			with open(pdbpath, "w") as f:
-				f.write("GROtesk MACabre and Sinister" + '\n')
-				f.write('{0:>5}'.format(atomn) + '\n')
-				f.writelines(line + '\n' for line in atoms)
-				f.write('{0:>10.5f}'.format(xbox) + '{0:>10.5f}'.format(ybox) + '{0:>10.5f}'.format(zbox) + '\n')
-		elif os.path.splitext(pdbpath)[1] == ".pdb":
-			# Need completion
-			pass
-class molmatrix2pdb(object):
-	def __init__(self, matrix):
-		self.mols = matrix
-	def write(self, pdbpath, writevelo = False):
-		atomn, moln = 0, 0
-		atoms = []
-		xbox, ybox, zbox = boxpara(np.vstack([mol.get("coordinate") for mol in self.mols.values()]))
-		if os.path.splitext(pdbpath)[1] == ".gro":
-			for j in range(1, len(self.mols)+1):
-				moln += 1
-				mol = self.mols.get(j)
-				molid = mol.get("id")
-				moltype = mol.get("name")
-				atom = mol.get("atom")
-				coordinate = mol.get("coordinate")
-				velocity = mol.get("velocity")
-				for i in range(len(atom)):
-					atomn += 1
-					if writevelo is True:
-						atoms.append('{0:>5}'.format(moln) + '{0:<4}'.format(moltype) + " "*2 +'{0:>4}'.format(atom[i]) + '{0:>5}'.format(atomn) + '{0:>8.3f}'.format(coordinate[i][0]) + '{0:>8.3f}'.format(coordinate[i][1]) + '{0:>8.3f}'.format(coordinate[i][2]) + '{0:>8.3f}'.format(velocity[i][0]) + '{0:>8.3f}'.format(velocity[i][1]) + '{0:>8.3f}'.format(velocity[i][2]))
-					else:
-						atoms.append('{0:>5}'.format(moln) + '{0:<4}'.format(moltype) + " "*2 +'{0:>4}'.format(atom[i]) + '{0:>5}'.format(atomn) + '{0:>8.3f}'.format(coordinate[i][0]) + '{0:>8.3f}'.format(coordinate[i][1]) + '{0:>8.3f}'.format(coordinate[i][2]))
-			with open(pdbpath, "w") as f:
-				f.write("GROtesk MACabre and Sinister" + '\n')
-				f.write('{0:>5}'.format(atomn) + '\n')
-				f.writelines(line + '\n' for line in atoms)
-				f.write('{0:>10.5f}'.format(xbox) + '{0:>10.5f}'.format(ybox) + '{0:>10.5f}'.format(zbox) + '\n')
-		elif os.path.splitext(pdbpath)[1] == ".pdb":
-			for j in range(1, len(self.mols)+1):
-				moln += 1
-				mol = self.mols.get(j)
-				molid = mol.get("id")
-				moltype = mol.get("name")
-				atom = mol.get("atom")
-				coordinate = mol.get("coordinate")
-				for i in range(len(atom)):
-					atomn += 1
-					atoms.append('{0:<6}'.format("HETATM") + '{0:>5}'.format(atomn) + " " + '{0:<4}'.format(atom[i]) + " " + '{0:>3}'.format(moltype) + " "*2 + '{0:>4}'.format(moln) + " "*4 + '{0:>8.3f}'.format(coordinate[i][0]*10) + '{0:>8.3f}'.format(coordinate[i][1]*10) + '{0:>8.3f}'.format(coordinate[i][2]*10) + '{0:>6.2f}'.format(1) + '{0:>6.2f}'.format(0) + " "*10 + '{0:>3}'.format(atom[i][0]))
-				with open(pdbpath, "w") as f:
-					f.write("REMARK" + '\n')
-					f.writelines(line + '\n' for line in atoms)
+				f.writelines(line + '\n' for line in watoms)
+	else:
+		raise ValueError("Can not write file that does not end with \"pdb\" or \"gro\".")
+# Group molecules
 def cluster(mols):
 	groups = {}
 	for molid in range(1, len(mols)+1):
 		moltype = mols.get(molid).get("name")
+		# New molecular group
 		if not groups:
 			groups.update({moltype:[molid]})
+		# Attribute the molecule to an existing group
 		else:
 			if moltype in groups.keys():
 				groups.get(moltype).append(molid)
