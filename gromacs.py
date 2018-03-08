@@ -528,7 +528,7 @@ def fitplane(pts):
         raise ValueError("Unsupported parameter given for plane function in function fitplane from module gromacs.")
 def rotate(vector, axis, cosang, sinang):
 	x, y, z = axis
-	rotmatrix = (1-cosang)*np.outer(axis, axis) + sinang*np.array([[0, z, -y], [-z, 0, x], [y, -z, 0]]) + cosang*np.diag([1, 1, 1])
+	rotmatrix = (1-cosang)*np.outer(axis, axis) + sinang*np.array([[0, -z, y], [z, 0, -x], [-y, x, 0]]) + cosang*np.eye(3)
 	return rotmatrix.dot(vector)
 # Function hbond only judge whether a hydrogen bond exists with these three coordinates
 def hbond(donor, hydro, acceptor, distance = 0.35, angle = 30):
@@ -684,7 +684,7 @@ class Moledit(object):
 		# Move target molecule to destination
 		# The molecule goes to where its center overlap the point
 		center = np.average(self.mols.get(movemol).get("coordinate").transpose(), axis=1)
-		self.mols.get(movemol).update({"coordinate":self.mols.get(movemol).get("coordinate")+vector-center})
+		self.mols.get(movemol).update({"coordinate":self.mols.get(movemol).get("coordinate")+point-center})
 	def orrient(self, movemol = 1, vector = [1., 1., 1.]):
 		# Check
 		if isinstance(vector, np.ndarray) and vector.ndim == 1 and vector.size == 3:
