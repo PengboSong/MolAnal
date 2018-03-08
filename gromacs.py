@@ -673,10 +673,10 @@ class Moledit(object):
 		self.mols.get(movemol).update({"coordinate":self.mols.get(movemol).get("coordinate")+vector})
 	def moveto(self, movemol = 1, point = [0., 0., 0.]):
 		# Check
-		if isinstance(vector, np.ndarray) and vector.ndim == 1 and vector.size == 3:
+		if isinstance(point, np.ndarray) and point.ndim == 1 and point.size == 3:
 			pass
-		elif isinstance(vector, (tuple, list)) and len(vector) == 3 and all([isinstance(v, (int, float)) for v in vector]):
-			vector = np.array(vector)
+		elif isinstance(point, (tuple, list)) and len(point) == 3 and all([isinstance(v, (int, float)) for v in point]):
+			point = np.array(point)
 		else:
 			raise TypeError("Get wrong parameters. \"point\" should be able to convert to a 1*3 matrix.")
 		if movemol not in self.mols.keys():
