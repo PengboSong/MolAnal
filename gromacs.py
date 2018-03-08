@@ -51,7 +51,13 @@ def convert_input_type(string):
 				return floating
 			except ValueError as e:
 				# If it is not a number, regard it as a string
-				return string
+				try:
+					# Caution: No check
+					eval(string)
+				except Exception:
+					return string
+				else:
+					return eval(string)
 	else:
 		return string
 def readline_csv(line, split_symbol = ';', comment_symbol = '#'):
@@ -381,7 +387,7 @@ def pdb2molmatrix(pdbpath, maxsize = 209715200):
 		else:
 			raise ValueError("Can not load file that does not end with \"pdb\" or \"gro\".")
 	return mols
-def atomatrix2pdb(self, atoms, pdbpath, writevelo = False):
+def atomatrix2pdb(atoms, pdbpath, writevelo = False):
 	# Start counting
 	atomn, moln = 0, 0
 	watoms = []
@@ -420,7 +426,7 @@ def atomatrix2pdb(self, atoms, pdbpath, writevelo = False):
 		pass
 	else:
 		raise ValueError("Can not write file that does not end with \"pdb\" or \"gro\".")
-def molmatrix2pdb(self, mols, pdbpath, writevelo = False):
+def molmatrix2pdb(mols, pdbpath, writevelo = False):
 	# Start counting
 	atomn, moln = 0, 0
 	watoms = []
@@ -520,6 +526,10 @@ def fitplane(pts):
             return a, b, c, d
     else:
         raise ValueError("Unsupported parameter given for plane function in function fitplane from module gromacs.")
+def rotate(vector, axis, cosang, sinang):
+	x, y, z = axis
+	rotmatrix = (1-cosang)*np.outer(axis, axis) + sinang*np.array([[0, z, -y], [-z, 0, x], [y, -z, 0]]) + cosang*np.diag([1, 1, 1])
+	return rotmatrix.dot(vector)
 # Function hbond only judge whether a hydrogen bond exists with these three coordinates
 def hbond(donor, hydro, acceptor, distance = 0.35, angle = 30):
 	if not isinstance(distance, float) and not isinstance(angle, (int, float)) and distance > 0 and 0 <= angle <= 180:
@@ -603,15 +613,28 @@ def hbondmol(molA, molB):
 class Moledit(object):
 	def __init__(self, pdbfile):
 		self.mols = pdb2molmatrix(pdbfile)
+		self.parentdir = os.path.split(pdbfile)[0]
+		self.pdbname = os.path.split(pdbfile)[1]
 		self.command()
 	def command(self):
-		cmd = input().strip()
+		print("Molecules Editing for GROMACS")
+		cmd = input(">>> ").strip()
+		lcmd = {"move":self.move, "moveto":self.moveto, "rotate":self.orrient, "write":self.write}
 		# Read commands from console
 		while cmd != "exit":
-			cmd = input().strip()
+			if cmd.split(" ")[0] not in lcmd.keys():
+				print("[Info] Unknown command.")
+			else:
+				try:
+					lcmd.get(cmd.split(" ")[0])(*([convert_input_type(x) for x in cmd.split(" ")[1:]]))
+				except Exception as e:
+					print("[Error] "+str(e)+".")
+			cmd = input(">>> ").strip()
 		save_and_exit = input("Save modifications?(Y/N)").strip().upper()
 		while save_and_exit not in ("Y", "N"):
 			save_and_exit = input("Save modifications?(Y/N)").strip().upper()
+		if save_and_exit == "Y":
+			self.write()
 		input("Press any key to exit...")
 	def cut(self, centermol = 1, shape = "sphere", parameter = (1.0,)):
 		# Check
@@ -692,6 +715,17 @@ class Moledit(object):
 		for i in range(len(molcoord)):
 			newcoord.append(rotate(molcoord[i]-center, axis, cosang, sinang) + center)
 		self.mols.get(movemol).update({"coordinate":np.array(newcoord)})
+	def write(self, copy = False):
+		if copy is True:
+			pdbname = input("Please enter the name to save as:")
+		else:
+			pdbname = self.pdbname
+		try:
+			molmatrix2pdb(self.mols, os.path.join(self.parentdir, pdbname))
+		except Exception as e:
+			print("[Error] "+str(e)+".")
+		else:
+			print("[Info] File %s has been written successfully." % pdbname)
 class TrajAnalysis(object):
 	def load(self, dirpath, num, name, frametype = "pdb"):
 		# Initialize
