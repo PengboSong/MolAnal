@@ -619,7 +619,7 @@ class Moledit(object):
 	def command(self):
 		print("Molecules Editing for GROMACS")
 		cmd = input(">>> ").strip()
-		lcmd = {"move":self.move, "moveto":self.moveto, "rotate":self.orrient, "write":self.write}
+		lcmd = {"move":self.move, "moveto":self.moveto, "rotate":self.orrient, "random-rotate":self.random_orrient,"write":self.write}
 		# Read commands from console
 		while cmd != "exit":
 			if cmd.split(" ")[0] not in lcmd.keys():
@@ -685,7 +685,7 @@ class Moledit(object):
 		# The molecule goes to where its center overlap the point
 		center = np.average(self.mols.get(movemol).get("coordinate").transpose(), axis=1)
 		self.mols.get(movemol).update({"coordinate":self.mols.get(movemol).get("coordinate")+point-center})
-	def orrient(self, movemol = 1, vector = [1., 1., 1.]):
+	def orrient(self, movemol = 1, vector = [0., 0., 1.]):
 		# Check
 		if isinstance(vector, np.ndarray) and vector.ndim == 1 and vector.size == 3:
 			pass
@@ -717,6 +717,9 @@ class Moledit(object):
 		for i in range(len(molcoord)):
 			newcoord.append(rotate(molcoord[i]-center, axis, cosang, sinang) + center)
 		self.mols.get(movemol).update({"coordinate":np.array(newcoord)})
+	def random_orrient(self, movemol):
+		import random
+		self.orrient(movemol, np.array([random.random() for i in range(3)]))
 	def write(self, copy = False):
 		if copy is True:
 			pdbname = input("Please enter the name to save as:")
