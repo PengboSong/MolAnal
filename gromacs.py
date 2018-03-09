@@ -529,7 +529,7 @@ def fitplane(pts):
 def rotate(vector, axis, cosang, sinang):
 	x, y, z = axis
 	rotmatrix = (1-cosang)*np.outer(axis, axis) + sinang*np.array([[0, -z, y], [z, 0, -x], [-y, x, 0]]) + cosang*np.eye(3)
-	return rotmatrix.dot(vector)
+	return np.dot(rotmatrix, vector)
 # Function hbond only judge whether a hydrogen bond exists with these three coordinates
 def hbond(donor, hydro, acceptor, distance = 0.35, angle = 30):
 	if not isinstance(distance, float) and not isinstance(angle, (int, float)) and distance > 0 and 0 <= angle <= 180:
@@ -701,14 +701,16 @@ class Moledit(object):
 		vector = vector/math.sqrt(vector.dot(vector))
 		# Coordinate matrix of target molecule
 		molcoord = self.mols.get(movemol).get("coordinate")
-		center = np.average(molcoord.transpose(), axis=1)
+		center = np.average(molcoord, axis=0)
 		# Get the normal vector determined by molecular coordinates
 		plps = fitplane([v for v in molcoord])
 		normal = np.array(plps[0:3])
+		normal = normal/math.sqrt(normal.dot(normal))
 		# Rotation axis
 		axis = np.cross(normal, vector)
+		axis = axis/math.sqrt(axis.dot(axis))
 		# Rotation angle
-		cosang = normal.dot(vector)/math.sqrt(normal.dot(normal)*vector.dot(vector))
+		cosang = np.dot(normal, vector)
 		sinang = math.sqrt(1-cosang**2)
 		# Rotate
 		newcoord = []
