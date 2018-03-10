@@ -760,8 +760,6 @@ class TrajAnalysis(object):
 		# Check
 		if not isinstance(atomA, int) or not ((isinstance(atomB, int) or (isinstance(atomB, (tuple, list)) and all([isinstance(v, int) for v in atomB])))):
 			raise ValueError("Wrong parameters. Function distance expects the first parameter should be ID for central atom and the second one be either one ID or some IDs packed in a tuple or list for surrounding atom(s).")
-		if not (isinstance(boxpara, (tuple, list)) and len(boxpara) == 3 and all([isinstance(v, (int, float)) for v in boxpara])) or not isinstance(pbc, bool):
-			raise ValueError("Wrong parameters. Function distance expects default parameter boxpara be a tuple os list with three number each be parameter of box in one dimension.")
 		if atomA > self.atomn or not (((isinstance(atomB, int) and atomB <= self.atomn) or (isinstance(atomB, (tuple, list)) and all([x <= self.atomn for x in atomB])))):
 			raise ValueError("Can not find pair atom(s) in the matrix provided.")
 		# Format
@@ -798,8 +796,6 @@ class TrajAnalysis(object):
 		# Check
 		if not isinstance(atom, int) or not (isinstance(plane, (tuple, list)) and len(plane) >= 3 and all([isinstance(v, int) for v in plane])):
 			raise ValueError("Wrong parameters. Function distance expects two parameters: the former should be ID for central atom and the latter should be atom IDs in the reference plane.")
-		if not (isinstance(boxpara, (tuple, list)) and len(boxpara) == 3 and all([isinstance(v, (int, float)) for v in boxpara])) or not isinstance(pbc, bool):
-			raise ValueError("Wrong parameters. Function distance expects default parameter boxpara be a tuple os list with three number each be parameter of box in one dimension.")
 		if atom > self.atomn or all([x <= self.atomn for x in plane]) is False:
 			raise ValueError("Can not find atom(s) in the matrix provided.")
 		# Format
