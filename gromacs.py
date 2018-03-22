@@ -886,7 +886,7 @@ class TrajAnalysis(object):
 		titleline = '{0:>6}'.format("frames") + " | " + '{0:>8}'.format("distance")
 		# Initialize log and counting
 		log = []
-		framen = 0
+		framen = -1
 		for framecoord in self.trajcoord:
 			framen += 1
 			# Original Coordinate
@@ -957,7 +957,7 @@ class TrajAnalysis(object):
 			hbonds.update({framen:molids})
 			# Counting of frames start from 0
 			framen += 1
-		print('{0:>6}'.format("frame") + " | " + '{0:>6}'.format("hbondn"))
+		print('{0:>6}'.format("frames") + " | " + '{0:>6}'.format("hbondn"))
 		for i in range(self.trajn):
 			print('{0:>6}'.format(i) + " | " + '{0:>6}'.format(tothbondn.get(i)))
 		return tothbondn, hbonds
