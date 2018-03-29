@@ -647,6 +647,12 @@ def hbondmol(molA, molB):
 		elif moltype == "NO3":
 			donlist = []
 			acclist = [1, 2, 3]
+		elif moltype == "DCF":
+			donlist = [(8, 22)]
+			acclist = [18, 19]
+		elif moltype == "LAS":
+			donlist = []
+			acclist = [7, 8, 9]
 		elif moltype == "SOL":
 			donlist = [(0, 1), (0, 2)]
 			acclist = [0]
@@ -827,14 +833,18 @@ class TrajAnalysis(object):
 		# Add atom id term for each atom, begin counting
 		# Atom ids would be count from 1
 		atomn = 1
+		moln = 0
 		for molid in firstframe.keys():
 			mol = firstframe.get(molid)
 			mol_atomn = len(mol.get("atom"))
 			molprof = {"name":mol.get("name"), "atom":mol.get("atom"), "atomid":[atomn+i for i in range(mol_atomn)]}
 			atomn += mol_atomn
+			moln += 1
 			self.trajprof.update({molid:molprof})
 		# atomn equals to total counting of atoms plus initial 1
 		self.atomn = atomn - 1
+		# moln equals to total molecule number
+		self.moln = moln
 		# Only load coordinates data of each frame (including the first one) into a matrix (N*3)
 		for i in range(num):
 			mols = pdb2molmatrix(os.path.join(dirpath, name + repr(i) + "." + frametype))
@@ -876,6 +886,44 @@ class TrajAnalysis(object):
 		print(titleline)
 		for line in log:
 			print(line)
+	def moldist(self, molid, atomid):
+		# Check
+		if not isinstance(molid, int) or not ((isinstance(atomid, int) or (isinstance(atomid, (tuple, list)) and all([isinstance(v, int) for v in atomid])))):
+			raise ValueError("Wrong parameters. Function distance expects the first parameter should be ID for the molecule and the second one be either one ID or some IDs packed in a tuple or list for surrounding atom(s).")
+		if molid > self.moln or not (((isinstance(atomid, int) and atomid <= self.atomn) or (isinstance(atomid, (tuple, list)) and all([x <= self.atomn for x in atomid])))):
+			raise ValueError("Can not find pair atom(s) in the matrix provided.")
+		# Format
+		if isinstance(atomid, (tuple, list)):
+			titleline = '{0:>6}'.format("frames") + " | " + " | ".join(['{0:>5}'.format(molid) + "-" + '{0:>5}'.format(atomi) for atomi in atomid])
+		else:
+			titleline = '{0:>6}'.format("frames") + " | " + '{0:>5}'.format(molid) + "-" + '{0:>5}'.format(atomid)
+		# Initialize log and counting
+		log = []
+		framen = -1
+		for framecoord in self.trajcoord:
+			framen += 1
+			# Calculate molecular center coordinate
+			molatomids = self.trajprof.get(molid).get("atomid")
+			center = np.average(framecoord[min(molatomids)-1:max(molatomids)], axis=0)
+			if isinstance(atomid, (tuple, list)):
+				dists = []
+				for atomi in atomid:
+					# Original Coordinate
+					pair0 = center - framecoord[atomi-1]
+					pairs = [pair0]
+					findist = min([math.sqrt(x.dot(x)) for x in pairs])
+					dists.append(findist)
+				log.append('{0:>6}'.format(framen) + " | " + " | ".join(['{0:>11.3f}'.format(d) for d in dists]))
+			else:
+				# Original Coordinate
+				pair0 = center - framecoord[atomid-1]
+				pairs = [pair0]
+				findist = min([math.sqrt(x.dot(x)) for x in pairs])
+				log.append('{0:>6}'.format(framen) + " | " + '{0:>11.3f}'.format(findist))
+		# Print to screen
+		print(titleline)
+		for line in log:
+			print(line)
 	def dist2plane(self, atom, plane):
 		# Check
 		if not isinstance(atom, int) or not (isinstance(plane, (tuple, list)) and len(plane) >= 3 and all([isinstance(v, int) for v in plane])):
@@ -892,6 +940,33 @@ class TrajAnalysis(object):
 			# Original Coordinate
 			coord = framecoord[atom-1]
 			coords= [coord]
+			# Function fitplane only accepts a package of at least three points' coordinate (better near a plane) in the form of either tuple or list, each element of the package should be a 1-dim 3-size numpy.ndarray object
+			plps = fitplane([framecoord[x-1] for x in plane])	# Short of plane parameters
+			# Attention: plps should be a tuple with 4 elements, denoted as a, b, c, d. The plane equation should be ax+by+cz=0
+			plnormal = np.array(plps[0:3])
+			pldist = min([abs(plnormal.dot(c) + plps[3])/(plnormal.dot(plnormal))**(1/2) for c in coords])
+			log.append('{0:>6}'.format(framen) + " | " + '{0:>8.3f}'.format(pldist))
+		# Print to screen
+		print(titleline)
+		for line in log:
+			print(line)
+	def moldist2plane(self, molid, plane):
+		# Check
+		if not isinstance(molid, int) or not (isinstance(plane, (tuple, list)) and len(plane) >= 3 and all([isinstance(v, int) for v in plane])):
+			raise ValueError("Wrong parameters. Function distance expects two parameters: the former should be ID for the molecule and the latter should be atom IDs in the reference plane.")
+		if molid > self.moln or all([x <= self.atomn for x in plane]) is False:
+			raise ValueError("Can not find atom(s) in the matrix provided.")
+		# Format
+		titleline = '{0:>6}'.format("frames") + " | " + '{0:>8}'.format("distance")
+		# Initialize log and counting
+		log = []
+		framen = -1
+		for framecoord in self.trajcoord:
+			framen += 1
+			# Calculate molecular center coordinate
+			molatomids = self.trajprof.get(molid).get("atomid")
+			center = np.average(framecoord[min(molatomids)-1:max(molatomids)], axis=0)
+			coords= [center]
 			# Function fitplane only accepts a package of at least three points' coordinate (better near a plane) in the form of either tuple or list, each element of the package should be a 1-dim 3-size numpy.ndarray object
 			plps = fitplane([framecoord[x-1] for x in plane])	# Short of plane parameters
 			# Attention: plps should be a tuple with 4 elements, denoted as a, b, c, d. The plane equation should be ax+by+cz=0
