@@ -1,7 +1,7 @@
 from gmx.inputFunctions import convert_input_type
 
 def readline_pdb(line, row):
-    rowText = format(row, 'd')
+	rowText = format(row, 'd')
 	# Read by column number
 	# Record type: 1-6, character, left
 	record = convert_input_type(line[0:6].strip())

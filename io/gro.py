@@ -1,7 +1,7 @@
 from gmx.inputFunctions import convert_input_type
 
 def readline_gro(line, row):
-    rowText = format(row, 'd')
+	rowText = format(row, 'd')
 	# Read by column number
 	# Molecular id: 1-5, character, right
 	mol_id = convert_input_type(line[0:5].strip())
