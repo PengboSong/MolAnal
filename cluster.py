@@ -1,7 +1,8 @@
-# Import frequent used modules
 import os
-import gromacs as gmx
-# Main class Cluster
+import numpy as np
+
+from gmx.structure.molMatrix import *
+
 class Cluster(object):
     def __init__(self):
         pass
