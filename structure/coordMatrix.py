@@ -20,3 +20,20 @@ def checkCoordinateMatrix(matrix):
     else:
         errorInfo = "Unsupported data format. Only handle matrix of numpy.ndarray type."
         return False, errorInfo
+
+def checkLineMatrix(matrix):
+    acceptableDataType = ["int32", "int64", "float64", "float128"]
+    errorInfo = ""
+    if isinstance(matrix, ndarray):
+        if matrix.dtype in acceptableDataType:
+            if matrix.ndim == 1:
+                return True, errorInfo
+            else:
+                errorInfo = "Unsupported data format. Only handle 1-dim matrix(vector)."
+                return False, errorInfo
+        else:
+            errorInfo = "Unsupported data format. Only handle matrix with number(integer or float) inside."
+            return False, errorInfo
+    else:
+        errorInfo = "Unsupported data format. Only handle matrix of numpy.ndarray type."
+        return False, errorInfo
