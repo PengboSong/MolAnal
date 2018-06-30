@@ -234,6 +234,77 @@ class TrajAnalysis(object):
 		print(titleline)
 		for line in log:
 			print(line)
+	def atomLocation(self, atomid):
+		# Check
+		if (
+		isinstance(atomid, int) and atomid <= self.atomn
+		):
+			# Format
+			titleline = '{0:>8}'.format("Frame") + " | " + '{0:>6}'.format("X") + " | " + '{0:>6}'.format("Y") + " | " + '{0:>6}'.format("Z")
+			# Initialize log and counting
+			log = []
+			framen = -1
+			sum = np.array([0., 0., 0.])
+			for framecoord in self.trajcoord:
+				framen += 1
+				# Calculate molecular center coordinate
+				location = framecoord[atomid-1]
+				sum += location
+				log.append('{0:>8}'.format(framen) + " | " + " | ".join(['{0:>6.3f}'.format(c) for c in location]))
+			# Print to screen
+			print(titleline)
+			for line in log:
+				print(line)
+			print('{0:>8}'.format("Average") + " | " + " | ".join(['{0:>6.3f}'.format(c / (framen + 1)) for c in sum]))
+		elif (
+		isinstance(atomid, (tuple, list)) and all([isinstance(a, int) and a <= self.atomn for a in atomid])
+		):
+			# Format
+			titleline = '{0:>8}'.format("Frame") + "|" + " | ".join(['{0:>5}'.format(a) + "X" + " | " + '{0:>5}'.format(a) + "Y" + " | " + '{0:>5}'.format(a) + "Z" for a in atomid])
+			# Initialize log and counting
+			log = []
+			framen = -1
+			sum = np.array([0.] * (3 * len(atomid)))
+			for framecoord in self.trajcoord:
+				framen += 1
+				location = []
+				# Calculate molecular center coordinate
+				for a in atomid:
+					location.extend(framecoord[a-1].tolist())
+				location = np.array(location)
+				sum += location
+				log.append('{0:>8}'.format(framen) + " | " + " | ".join(['{0:>6.3f}'.format(c) for c in location]))
+			# Print to screen
+			print(titleline)
+			for line in log:
+				print(line)
+			print('{0:>8}'.format("Average") + " | " + " | ".join(['{0:>6.3f}'.format(c / (framen + 1)) for c in sum]))
+		else:
+			raise ValueError("Wrong parameters. Function atomLocation expects an integer parameter which is the selected atom ID, or a tuple or list each of which is atom ID wanted.")
+	def molcenter(self, molid):
+		# Check
+		if not isinstance(molid, int):
+			raise ValueError("Wrong parameters. Function molcenter expects an integer parameter which is the selected molecule ID.")
+		if molid > self.moln:
+			raise ValueError("Can not find pair molecule in the matrix provided.")
+		# Format
+		titleline = '{0:>8}'.format("Frame") + " | " + '{0:>6}'.format("X") + " | " + '{0:>6}'.format("Y") + " | " + '{0:>6}'.format("Z")
+		# Initialize log and counting
+		log = []
+		framen = -1
+		sum = np.array([0., 0., 0.])
+		for framecoord in self.trajcoord:
+			framen += 1
+			# Calculate molecular center coordinate
+			molatomids = self.trajprof.get(molid).get("atomid")
+			center = np.average(framecoord[min(molatomids)-1:max(molatomids)], axis=0)
+			sum += center
+			log.append('{0:>8}'.format(framen) + " | " + " | ".join(['{0:>6.3f}'.format(c) for c in center]))
+		# Print to screen
+		print(titleline)
+		for line in log:
+			print(line)
+		print('{0:>8}'.format("Average") + " | " + " | ".join(['{0:>6.3f}'.format(c / (framen + 1)) for c in sum]))
 	def dist2plane(self, atom, plane):
 		# Check
 		if not isinstance(atom, int) or not (isinstance(plane, (tuple, list)) and len(plane) >= 3 and all([isinstance(v, int) for v in plane])):
