@@ -1,7 +1,8 @@
-import os
+import os, sys
 import math
 import random
 import numpy as np
+import time
 
 from gmx.inputFunctions import convert_input_type
 from gmx.io.log import *
@@ -9,7 +10,11 @@ from gmx.structure.molMatrix import *
 from gmx.math.common import cluster
 from gmx.math.common import fitplane
 from gmx.math.common import rotate
+from gmx.math.common import convertSeconds
 from gmx.math.hbond import hbondmol
+from gmx.math.rmsd import rmsdMol
+
+from custom.general import setProgressBar
 
 class Moledit(object):
 	def __init__(self, pdbfile):
@@ -17,6 +22,7 @@ class Moledit(object):
 		self.parentdir = os.path.split(pdbfile)[0]
 		self.pdbname = os.path.split(pdbfile)[1]
 		self.command()
+
 	def command(self):
 		print("Molecules Editing for GROMACS")
 		cmd = input(">>> ").strip()
@@ -37,6 +43,7 @@ class Moledit(object):
 		if save_and_exit == "Y":
 			self.write()
 		input("Press any key to exit...")
+
 	def cut(self, centermol = 1, shape = "sphere", parameter = (1.0,)):
 		# Check
 		if centermol not in self.mols.keys():
@@ -60,6 +67,7 @@ class Moledit(object):
 			return inside, outside
 		else:
 			raise ValueError("Unsupported operation name given.")
+
 	def move(self, movemol = 1, vector = [0., 0., 0.]):
 		# Check
 		if isinstance(vector, np.ndarray) and vector.ndim == 1 and vector.size == 3:
@@ -72,6 +80,7 @@ class Moledit(object):
 			raise ValueError("Can not find target molecule in the file provided.")
 		# Move
 		self.mols.get(movemol).update({"coordinate":self.mols.get(movemol).get("coordinate")+vector})
+
 	def moveto(self, movemol = 1, point = [0., 0., 0.]):
 		# Check
 		if isinstance(point, np.ndarray) and point.ndim == 1 and point.size == 3:
@@ -86,6 +95,7 @@ class Moledit(object):
 		# The molecule goes to where its center overlap the point
 		center = np.average(self.mols.get(movemol).get("coordinate").transpose(), axis=1)
 		self.mols.get(movemol).update({"coordinate":self.mols.get(movemol).get("coordinate")+point-center})
+
 	def orrient(self, movemol = 1, vector = [0., 0., 1.]):
 		# Check
 		if isinstance(vector, np.ndarray) and vector.ndim == 1 and vector.size == 3:
@@ -118,8 +128,10 @@ class Moledit(object):
 		for i in range(len(molcoord)):
 			newcoord.append(rotate(molcoord[i]-center, axis, cosang, sinang) + center)
 		self.mols.get(movemol).update({"coordinate":np.array(newcoord)})
+
 	def random_orrient(self, movemol):
 		self.orrient(movemol, np.array([random.random() for i in range(3)]))
+
 	def write(self, copy = False):
 		if copy is True:
 			pdbname = input("Please enter the name to save as:")
@@ -131,14 +143,93 @@ class Moledit(object):
 			print("[Error] "+str(e)+".")
 		else:
 			print("[Info] File %s has been written successfully." % pdbname)
+
 class TrajAnalysis(object):
-	def load(self, dirpath, num, name, frametype = "pdb"):
+	def __init__(self):
+		self.trajprof = {}
+		self.trajcoord = []
+		self.trajn = 0
+		self.atomn = 0
+		self.moln = 0
+
+		self._savePath = "."
+		self._loadPath = "."
+
+	def getSavePath(self):
+		return self._savePath
+	def setSavePath(self, path):
+		if os.path.isdir(path):
+			self._savePath = path
+		else:
+			print("[Error] Invalid path. The given path should be a existing directory.")
+
+	def getLoadPath(self):
+		return self._loadPath
+	def setLoadPath(self, path):
+		if os.path.isdir(path):
+			self._loadPath = path
+		else:
+			print("[Error] Invalid path. The given path should be a existing directory.")
+
+	def clearAll(self):
+		self.trajprof = {}
+		self.trajcoord = []
+		self.trajn = 0
+		self.trajstartn = 0
+		self.trajendn = 0
+		self.atomn = 0
+		self.moln = 0
+
+	def listCommand(self):
+		cmdList = [x for x in dir(self) if not x.startswith("_") and callable(getattr(self, x))]
+		cmdList.sort()
+		for i in range(len(cmdList)):
+			print(str(i + 1) + ": " + cmdList[i])
+
+	def command(self):
+		def exit():
+			exitConfirm = input("Exit?(Y/N)").strip().upper()
+			while exitConfirm not in ("Y", "N"):
+				exitConfirm = input("Save modifications?(Y/N)").strip().upper()
+			if exitConfirm == "Y":
+				return True
+			else:
+				return False
+
+		print("Trajectory Analysis for GROMACS")
+		cmd = input(">>> ").strip()
+		# Read commands from console
+		while True:
+			inputCmdList = cmd.split()
+			if inputCmdList[0] == "exit":
+				if exit():
+					break
+			elif not hasattr(self, inputCmdList[0]):
+				print("[Info] Invalid command.")
+			else:
+				try:
+					getattr(self, inputCmdList[0])(*([convert_input_type(x) for x in inputCmdList[1:]]))
+				except Exception as e:
+					print("[Error] "+str(e)+".")
+			cmd = input(">>> ").strip()
+		input("Press any key to exit...")
+
+	def load(self, start, end, name, frametype = "pdb"):
+		def framePath(index):
+			if isinstance(index, int):
+				frameName = name + str(index) + "." + frametype
+				return os.path.join(self._loadPath, frameName)
+			else:
+				return None
+
 		# Initialize
 		self.trajprof = {}
 		self.trajcoord = []
-		self.trajn = num
+		self.trajn = end - start + 1
+		self.trajstartn = start
+		self.trajendn = end
 		# Load trajectory profile from the first frame(should end with number 0)
-		firstframe = pdb2molmatrix(os.path.join(dirpath, name + "0" + "." + frametype))
+		firstframe = pdb2molmatrix(framePath(start))
 		# Remove coordinate and velocity terms
 		# Add atom id term for each atom, begin counting
 		# Atom ids would be count from 1
@@ -147,217 +238,296 @@ class TrajAnalysis(object):
 		for molid in firstframe.keys():
 			mol = firstframe.get(molid)
 			mol_atomn = len(mol.get("atom"))
-			molprof = {"name":mol.get("name"), "atom":mol.get("atom"), "atomid":[atomn+i for i in range(mol_atomn)]}
+			molprof = {
+			"name":mol.get("name"),
+			"atom":mol.get("atom"),
+			"atomid":[atomn+i for i in range(mol_atomn)]
+			}
 			atomn += mol_atomn
 			moln += 1
 			self.trajprof.update({molid:molprof})
-		# atomn equals to total counting of atoms plus initial 1
+		# atomn equals to total counting of atoms minus initial 1
 		self.atomn = atomn - 1
 		# moln equals to total molecule number
 		self.moln = moln
 		# Only load coordinates data of each frame (including the first one) into a matrix (N*3)
-		for i in range(num):
-			mols = pdb2molmatrix(os.path.join(dirpath, name + repr(i) + "." + frametype))
+		sys.stdout.write("[Info] Start reading files.\n")
+		for i in range(self.trajstartn, self.trajendn + 1):
+			mols = pdb2molmatrix(framePath(i))
 			self.trajcoord.append(np.vstack([mol.get("coordinate") for mol in mols.values()]))
-			print("[Info] File %s is loaded successfully." % (name + repr(i) + "." + frametype))
+			sys.stdout.write(setProgressBar(100, round((i / self.trajn) * 100)))
+			sys.stdout.flush()
+		sys.stdout.write(setProgressBar(100, 100))
+		sys.stdout.write("\n[Info] All File have loaded successfully.\r\n")
+
+	def writeLog(self, name, log, suffix = ".txt"):
+		if not isinstance(name, str) or not (isinstance(log, (tuple, list)) and all([isinstance(l, str) for l in log])):
+			raise TypeError("[Error] Wrong parameters. Function writeLog expects the first parameter to be a string and the second one to be a string list (or tuple).")
+		else:
+			# yyyymmdd-HHMMSS
+			timeFormat = time.strftime("%Y%m%d_%H%M%S")
+			fileName = name + "_" + timeFormat + suffix
+			with open(os.path.join(self._savePath, fileName), "w") as f:
+				f.writelines(line + '\n' for line in log)
+
+	def checkAtomID(self, atomID):
+		if isinstance(atomID, int) and atomID <= self.atomn:
+			return True
+		else:
+			return False
+	def checkAtomIDList(self, atomIDList):
+		if isinstance(atomIDList, (tuple, list)) and all([self.checkAtomID(a) for a in atomIDList]):
+			return True
+		else:
+			return False
+
+	def checkMolID(self, molID):
+		if isinstance(molID, int) and molID <= self.moln:
+			return True
+		else:
+			return False
+	def checkMolIDList(self, molIDList):
+		if isinstance(molIDList, (tuple, list)) and all([self.checkMolID(m) for m in molIDList]):
+			return True
+		else:
+			return False
+	def checkFrameID(self, frameID):
+		if isinstance(frameID, int) and self.trajstartn <= frameID <= self.trajendn:
+			return True
+		else:
+			return False
+	def checkFrameIDList(self, frameIDList):
+		if isinstance(frameIDList, (tuple, list)) and all([self.checkMolID(f) for f in frameIDList]):
+			return True
+		else:
+			return False
+
+	def molCenter(self, frameID, molID):
+		atomIDList = self.trajprof.get(molID).get("atomid")
+		framecoord = self.trajprof[frameID - self.trajstartn]
+		center = np.average(framecoord[min(atomIDList) - 1 : max(atomIDList)], axis=0)
+		return center
+	def molCenterWithCoord(self, framecoord, molID):
+		atomIDList = self.trajprof.get(molID).get("atomid")
+		center = np.average(framecoord[min(atomIDList) - 1 : max(atomIDList)], axis=0)
+		return center
+
 	def distance(self, atomA, atomB):
 		# Check
-		if not isinstance(atomA, int) or not ((isinstance(atomB, int) or (isinstance(atomB, (tuple, list)) and all([isinstance(v, int) for v in atomB])))):
-			raise ValueError("Wrong parameters. Function distance expects the first parameter should be ID for central atom and the second one be either one ID or some IDs packed in a tuple or list for surrounding atom(s).")
-		if atomA > self.atomn or not (((isinstance(atomB, int) and atomB <= self.atomn) or (isinstance(atomB, (tuple, list)) and all([x <= self.atomn for x in atomB])))):
-			raise ValueError("Can not find pair atom(s) in the matrix provided.")
-		# Format
-		if isinstance(atomB, (tuple, list)):
-			titleline = '{0:>6}'.format("frames") + " | " + " | ".join(['{0:>5}'.format(atomA) + "-" + '{0:>5}'.format(atomBi) for atomBi in atomB])
-		else:
-			titleline = '{0:>6}'.format("frames") + " | " + '{0:>5}'.format(atomA) + "-" + '{0:>5}'.format(atomB)
-		# Initialize log and counting
-		log = []
-		framen = -1
+		if self.checkAtomID(atomB):
+			atomB = tuple(atomB)
+		if not self.checkAtomID(atomA) or not self.checkAtomIDList(atomB):
+			raise ValueError("Wrong parameters. Function distance expects the first parameter to be the central atom ID and the second one to be an ID list (or tuple) for pair atom(s).")
+
+		# Title
+		titleline = '{0:>6}'.format("frames") + " | " + " | ".join(['{0:>5}'.format(atomA) + "-" + '{0:>5}'.format(b) for b in atomB])
+		log = [titleline]
+		# Start Counting
+		# Be aware that counting number plus 1 at the beginning of the loop
+		# So it should begin from the former integer of start frame ID
+		# The same below
+		framen = self.trajstartn - 1
 		for framecoord in self.trajcoord:
 			framen += 1
 			coordA = framecoord[atomA-1]
-			if isinstance(atomB, (tuple, list)):
-				dists = []
-				for atomBi in atomB:
-					# Original Coordinate
-					pair0 = coordA - framecoord[atomBi-1]
-					pairs = [pair0]
-					findist = min([math.sqrt(x.dot(x)) for x in pairs])
-					dists.append(findist)
-				log.append('{0:>6}'.format(framen) + " | " + " | ".join(['{0:>11.3f}'.format(d) for d in dists]))
-			else:
-				# Original Coordinate
-				pair0 = coordA - framecoord[atomBi-1]
-				pairs = [pair0]
-				findist = min([math.sqrt(x.dot(x)) for x in pairs])
-				log.append('{0:>6}'.format(framen) + " | " + '{0:>11.3f}'.format(findist))
-		# Print to screen
-		print(titleline)
-		for line in log:
-			print(line)
-	def moldist(self, molid, atomid):
+			dists = []
+			for b in atomB:
+				pair0 = coordA - framecoord[b - 1]
+				findist = math.sqrt(pair0.dot(pair0))
+				dists.append(findist)
+			log.append('{0:>6}'.format(framen) + " | " + " | ".join(['{0:>11.3f}'.format(d) for d in dists]))
+
+		self.writeLog("distance", log)
+
+	def distanceMol(self, molid, atomid):
 		# Check
-		if not isinstance(molid, int) or not ((isinstance(atomid, int) or (isinstance(atomid, (tuple, list)) and all([isinstance(v, int) for v in atomid])))):
-			raise ValueError("Wrong parameters. Function distance expects the first parameter should be ID for the molecule and the second one be either one ID or some IDs packed in a tuple or list for surrounding atom(s).")
-		if molid > self.moln or not (((isinstance(atomid, int) and atomid <= self.atomn) or (isinstance(atomid, (tuple, list)) and all([x <= self.atomn for x in atomid])))):
-			raise ValueError("Can not find pair atom(s) in the matrix provided.")
-		# Format
-		if isinstance(atomid, (tuple, list)):
-			titleline = '{0:>6}'.format("frames") + " | " + " | ".join(['{0:>5}'.format(molid) + "-" + '{0:>5}'.format(atomi) for atomi in atomid])
-		else:
-			titleline = '{0:>6}'.format("frames") + " | " + '{0:>5}'.format(molid) + "-" + '{0:>5}'.format(atomid)
-		# Initialize log and counting
-		log = []
-		framen = -1
+		if self.checkAtomID(atomid):
+			atomid = tuple(atomid)
+		if not self.checkMolID(molid) or not self.checkAtomIDList(atomid):
+			raise ValueError("Wrong parameters. Function distance expects the first parameter to be the selected molecular ID and the second one to be an ID list (or tuple) for pair atom(s).")
+
+		# Title
+		titleline = '{0:>6}'.format("frames") + " | " + " | ".join(['{0:>5}'.format(molid) + "-" + '{0:>5}'.format(a) for a in atomid])
+		log = [titleline]
+		# Start Counting
+		framen = self.trajstartn - 1
 		for framecoord in self.trajcoord:
 			framen += 1
-			# Calculate molecular center coordinate
-			molatomids = self.trajprof.get(molid).get("atomid")
-			center = np.average(framecoord[min(molatomids)-1:max(molatomids)], axis=0)
-			if isinstance(atomid, (tuple, list)):
-				dists = []
-				for atomi in atomid:
-					# Original Coordinate
-					pair0 = center - framecoord[atomi-1]
-					pairs = [pair0]
-					findist = min([math.sqrt(x.dot(x)) for x in pairs])
-					dists.append(findist)
-				log.append('{0:>6}'.format(framen) + " | " + " | ".join(['{0:>11.3f}'.format(d) for d in dists]))
-			else:
-				# Original Coordinate
-				pair0 = center - framecoord[atomid-1]
-				pairs = [pair0]
-				findist = min([math.sqrt(x.dot(x)) for x in pairs])
-				log.append('{0:>6}'.format(framen) + " | " + '{0:>11.3f}'.format(findist))
-		# Print to screen
-		print(titleline)
-		for line in log:
-			print(line)
-	def atomLocation(self, atomid):
+			center = self.molCenterWithCoord(framecoord, molid)
+			dists = []
+			for a in atomid:
+				pair0 = center - framecoord[a - 1]
+				findist = math.sqrt(pair0.dot(pair0))
+				dists.append(findist)
+			log.append('{0:>6}'.format(framen) + " | " + " | ".join(['{0:>11.3f}'.format(d) for d in dists]))
+
+		self.writeLog("distance_mol", log)
+
+	def location(self, atomid):
 		# Check
-		if (
-		isinstance(atomid, int) and atomid <= self.atomn
-		):
-			# Format
-			titleline = '{0:>8}'.format("Frame") + " | " + '{0:>6}'.format("X") + " | " + '{0:>6}'.format("Y") + " | " + '{0:>6}'.format("Z")
-			# Initialize log and counting
-			log = []
-			framen = -1
-			sum = np.array([0., 0., 0.])
-			for framecoord in self.trajcoord:
-				framen += 1
-				# Calculate molecular center coordinate
-				location = framecoord[atomid-1]
-				sum += location
-				log.append('{0:>8}'.format(framen) + " | " + " | ".join(['{0:>6.3f}'.format(c) for c in location]))
-			# Print to screen
-			print(titleline)
-			for line in log:
-				print(line)
-			print('{0:>8}'.format("Average") + " | " + " | ".join(['{0:>6.3f}'.format(c / (framen + 1)) for c in sum]))
-		elif (
-		isinstance(atomid, (tuple, list)) and all([isinstance(a, int) and a <= self.atomn for a in atomid])
-		):
-			# Format
-			titleline = '{0:>8}'.format("Frame") + "|" + " | ".join(['{0:>5}'.format(a) + "X" + " | " + '{0:>5}'.format(a) + "Y" + " | " + '{0:>5}'.format(a) + "Z" for a in atomid])
-			# Initialize log and counting
-			log = []
-			framen = -1
-			sum = np.array([0.] * (3 * len(atomid)))
-			for framecoord in self.trajcoord:
-				framen += 1
-				location = []
-				# Calculate molecular center coordinate
-				for a in atomid:
-					location.extend(framecoord[a-1].tolist())
-				location = np.array(location)
-				sum += location
-				log.append('{0:>8}'.format(framen) + " | " + " | ".join(['{0:>6.3f}'.format(c) for c in location]))
-			# Print to screen
-			print(titleline)
-			for line in log:
-				print(line)
-			print('{0:>8}'.format("Average") + " | " + " | ".join(['{0:>6.3f}'.format(c / (framen + 1)) for c in sum]))
-		else:
-			raise ValueError("Wrong parameters. Function atomLocation expects an integer parameter which is the selected atom ID, or a tuple or list each of which is atom ID wanted.")
-	def molcenter(self, molid):
-		# Check
-		if not isinstance(molid, int):
-			raise ValueError("Wrong parameters. Function molcenter expects an integer parameter which is the selected molecule ID.")
-		if molid > self.moln:
-			raise ValueError("Can not find pair molecule in the matrix provided.")
-		# Format
-		titleline = '{0:>8}'.format("Frame") + " | " + '{0:>6}'.format("X") + " | " + '{0:>6}'.format("Y") + " | " + '{0:>6}'.format("Z")
-		# Initialize log and counting
-		log = []
-		framen = -1
-		sum = np.array([0., 0., 0.])
+		if self.checkAtomID(atomid):
+			atomid = tuple(atomid)
+		if not self.checkAtomIDList(atomid):
+			raise ValueError("Wrong parameters. Function atomLocation expects one parameter to be an ID list (or tuple) for selected atom(s).")
+
+		# Title
+		titleline = '{0:>8}'.format("Frame") + " | " + " | ".join(['{0:>5}'.format(a) + "X" + " | " + '{0:>5}'.format(a) + "Y" + " | " + '{0:>5}'.format(a) + "Z" for a in atomid])
+		log = [titleline]
+		# Start Counting
+		framen = self.trajstartn - 1
+		sum = np.zeros((3 * len(atomid),))
 		for framecoord in self.trajcoord:
 			framen += 1
-			# Calculate molecular center coordinate
-			molatomids = self.trajprof.get(molid).get("atomid")
-			center = np.average(framecoord[min(molatomids)-1:max(molatomids)], axis=0)
-			sum += center
-			log.append('{0:>8}'.format(framen) + " | " + " | ".join(['{0:>6.3f}'.format(c) for c in center]))
-		# Print to screen
-		print(titleline)
-		for line in log:
-			print(line)
-		print('{0:>8}'.format("Average") + " | " + " | ".join(['{0:>6.3f}'.format(c / (framen + 1)) for c in sum]))
-	def dist2plane(self, atom, plane):
+			locations = []
+			for a in atomid:
+				locations.extend(framecoord[a-1].tolist())
+			locations = np.array(locations)
+			sum += locations
+			log.append('{0:>8}'.format(framen) + " | " + " | ".join(['{0:>6.3f}'.format(c) for c in locations]))
+		log.append('{0:>8}'.format("Average") + " | " + " | ".join(['{0:>6.3f}'.format(c / (framen + 1)) for c in sum]))
+
+		self.writeLog("location", log)
+
+	def locationMol(self, molid):
 		# Check
-		if not isinstance(atom, int) or not (isinstance(plane, (tuple, list)) and len(plane) >= 3 and all([isinstance(v, int) for v in plane])):
-			raise ValueError("Wrong parameters. Function distance expects two parameters: the former should be ID for central atom and the latter should be atom IDs in the reference plane.")
-		if atom > self.atomn or all([x <= self.atomn for x in plane]) is False:
-			raise ValueError("Can not find atom(s) in the matrix provided.")
+		if self.checkMolID(molid):
+			molid = tuple(molid)
+		if not self.checkMolIDList(molid):
+			raise ValueError("Wrong parameters. Function molLocation expects one parameter to be an ID list (or tuple) for selected molecule(s).")
+
+		# Title
+		titleline = '{0:>8}'.format("Frame") + " | " + " | ".join(['{0:>5}'.format(m) + "X" + " | " + '{0:>5}'.format(m) + "Y" + " | " + '{0:>5}'.format(m) + "Z" for m in molid])
+		log = [titleline]
+		# Start Counting
+		framen = self.trajstartn - 1
+		sum = np.zeros((3 * len(molid),))
+		for framecoord in self.trajcoord:
+			framen += 1
+			centers = []
+			for m in molid:
+				centers.extend(self.molCenterWithCoord(framecoord, m))
+			centers = np.array(centers)
+			sum += centers
+			log.append('{0:>8}'.format(framen) + " | " + " | ".join(['{0:>6.3f}'.format(c) for c in centers]))
+		log.append('{0:>8}'.format("Average") + " | " + " | ".join(['{0:>6.3f}'.format(c / (framen + 1)) for c in sum]))
+
+		self.writeLog("location_mol", log)
+
+	def dist2plane(self, atomid, plane):
+		# Check
+		if not self.checkAtomID(atomid) or not self.checkAtomIDList(plane):
+			raise ValueError("Wrong parameters. Function dist2plane expects the first parameter to be the central atom ID and the second one to be an ID list (or tuple) for atom(s) in the reference plane.")
+		else:
+			if len(plane) < 3:
+				raise ValueError("Need at least 3 points to fit a plane.")
+
 		# Format
 		titleline = '{0:>6}'.format("frames") + " | " + '{0:>8}'.format("distance")
-		# Initialize log and counting
-		log = []
-		framen = -1
+		log = [titleline]
+		# Start Counting
+		framen = self.trajstartn - 1
 		for framecoord in self.trajcoord:
 			framen += 1
-			# Original Coordinate
-			coord = framecoord[atom-1]
-			coords= [coord]
+			coord = framecoord[atomid - 1]
 			# Function fitplane only accepts a package of at least three points' coordinate (better near a plane) in the form of either tuple or list, each element of the package should be a 1-dim 3-size numpy.ndarray object
-			plps = fitplane([framecoord[x-1] for x in plane])	# Short of plane parameters
+			plps = fitplane([framecoord[x - 1] for x in plane])	# Short of plane parameters
 			# Attention: plps should be a tuple with 4 elements, denoted as a, b, c, d. The plane equation should be ax+by+cz=0
 			plnormal = np.array(plps[0:3])
-			pldist = min([abs(plnormal.dot(c) + plps[3])/(plnormal.dot(plnormal))**(1/2) for c in coords])
+			pldist = abs(plnormal.dot(coord) + plps[3])/math.sqrt(plnormal.dot(plnormal))
 			log.append('{0:>6}'.format(framen) + " | " + '{0:>8.3f}'.format(pldist))
-		# Print to screen
-		print(titleline)
-		for line in log:
-			print(line)
-	def moldist2plane(self, molid, plane):
+
+		self.writeLog("dist2plane", log)
+
+	def dist2planeMol(self, molid, plane):
 		# Check
-		if not isinstance(molid, int) or not (isinstance(plane, (tuple, list)) and len(plane) >= 3 and all([isinstance(v, int) for v in plane])):
-			raise ValueError("Wrong parameters. Function distance expects two parameters: the former should be ID for the molecule and the latter should be atom IDs in the reference plane.")
-		if molid > self.moln or all([x <= self.atomn for x in plane]) is False:
-			raise ValueError("Can not find atom(s) in the matrix provided.")
-		# Format
+		if not self.checkMolID(molid) or not self.checkAtomIDList(plane):
+			raise ValueError("Wrong parameters. Function dist2planeMol expects the first parameter to be the selected molecular ID and the second one to be an ID list (or tuple) for atom(s) in the reference plane.")
+		else:
+			if len(plane) < 3:
+				raise ValueError("Need at least 3 points to fit a plane.")
+
+		# Title
 		titleline = '{0:>6}'.format("frames") + " | " + '{0:>8}'.format("distance")
-		# Initialize log and counting
-		log = []
-		framen = -1
+		log = [titleline]
+		# Start Counting
+		framen = self.trajstartn - 1
 		for framecoord in self.trajcoord:
 			framen += 1
-			# Calculate molecular center coordinate
-			molatomids = self.trajprof.get(molid).get("atomid")
-			center = np.average(framecoord[min(molatomids)-1:max(molatomids)], axis=0)
-			coords= [center]
+			center = self.molCenterWithCoord(framecoord, molid)
 			# Function fitplane only accepts a package of at least three points' coordinate (better near a plane) in the form of either tuple or list, each element of the package should be a 1-dim 3-size numpy.ndarray object
-			plps = fitplane([framecoord[x-1] for x in plane])	# Short of plane parameters
+			plps = fitplane([framecoord[x - 1] for x in plane])	# Short of plane parameters
 			# Attention: plps should be a tuple with 4 elements, denoted as a, b, c, d. The plane equation should be ax+by+cz=0
 			plnormal = np.array(plps[0:3])
-			pldist = min([abs(plnormal.dot(c) + plps[3])/(plnormal.dot(plnormal))**(1/2) for c in coords])
+			pldist = abs(plnormal.dot(center) + plps[3])/math.sqrt(plnormal.dot(plnormal))
 			log.append('{0:>6}'.format(framen) + " | " + '{0:>8.3f}'.format(pldist))
-		# Print to screen
-		print(titleline)
-		for line in log:
-			print(line)
+
+		self.writeLog("dist2plane_mol", log)
+
+	def rmsd(self, framen):
+		# Check
+		if not self.checkFrameID(framen):
+			raise ValueError("Wrong parameters. Function rmsd expects one parameter to be the selected frame ID.")
+
+		# Title
+		titleLine = '{0:>6}'.format("frames") + " | " + '{0:>8}'.format("RMSD")
+		log = [titleLine]
+		# Reference frame
+		refMatrix = self.trajcoord[framen - self.trajstartn]
+		weightFactor = np.ones(self.atomn)
+		# Start Counting
+		framen = self.trajstartn
+		for i in range(self.trajn):
+			framen += 1
+			thisMatrix = self.trajcoord[i]
+			rmsdv = rmsdMol(refMatrix, thisMatrix, weightFactor)
+			log.append('{0:>6}'.format(framen) + " | " + '{0:>8.3f}'.format(rmsdv))
+
+		self.writeLog("rmsd_mol", log)
+
+	def clusterSingleLinkage(self, cutoff):
+		# Construct RMSD Matrix
+		rmsdMatrix = np.zeros((self.trajn, self.trajn))
+		weightFactor = np.ones(self.atomn)
+		startTime = time.time()
+		sys.stdout.write("[Info] Start calculating RMSD matrix.\n")
+		for i in range(self.trajn - 1):
+			for j in range(i + 1, self.trajn):
+				rmsdMatrix[i][j] = rmsdMol(self.trajcoord[i], self.trajcoord[j], weightFactor)
+				rmsdMatrix[j][i] = rmsdMatrix[i][j]
+			sys.stdout.write(setProgressBar(100, round((i / self.trajn) * 100)))
+			sys.stdout.flush()
+		endTime = time.time()
+		sys.stdout.write(setProgressBar(100, 100))
+		sys.stdout.write("\n[Info] RMSD matrix calculation normally ends.\r\n")
+		print("[Info] Total time usage = %s." % convertSeconds(endTime - startTime))
+
+		rmsdLog = [";".join(['{0:>6.3f}'.format(i) for i in r]) for r in rmsdMatrix]
+
+		# Cluster
+		clusters = [[0 + self.trajstartn]]
+		for i in range(1, self.trajn):
+			newGroupFlag = True
+			for group in clusters:
+				# rmsdMatrix index equals to frame index minus start frame index, start from 0
+				if all([rmsdMatrix[i][g - self.trajstartn] < cutoff for g in group]):
+					group.append(i + self.trajstartn)
+					newGroupFlag = False
+					break
+			if newGroupFlag is True:
+				clusters.append([i + self.trajstartn])
+
+		titleLine = '{0:>6}'.format("Groupn") + " | " + '{0:>24}'.format("Group members (Framen)")
+		log = [titleLine]
+		groupn = 0
+		for group in clusters:
+			groupn += 1
+			log.append('{0:>6}'.format(groupn) + " | " + ', '.join([str(g) for g in group]))
+
+		self.writeLog("cluster_single_linkage", log)
+		self.writeLog("cluster_rmsd_matrix", rmsdLog, ".csv")
+
+		return rmsdMatrix
+
 	def hbondgrp(self, moltypeA, moltypeB):
 		def hbondmolgrp(prof, framecoord, moltypeA, moltypeB):
 			# Grouping
@@ -394,44 +564,63 @@ class TrajAnalysis(object):
 		profgrp = cluster(self.trajprof)
 		if moltypeA not in profgrp.keys() or moltypeB not in profgrp.keys():
 			raise ValueError("Wrong parameters. Function hbondgrp expects at least two parameters, both of them should be three-letter tags of corresponding molecules.")
-		# Format
+		# Title
 		frametitle = '{0:>14}'.format("donor") + " | " + '{0:>14}'.format("hydro") + " | " + '{0:>14}'.format("acceptor") + " | " + '{0:>9}'.format("distance") + " | " + '{0:>6}'.format("angle")
-		# Start counting number of frames
-		framen = 0
+		log = []
+		# Start Counting
+		# Counting at the end of the loop
+		framen = self.trajstartn
 		# Initialize dict
 		tothbondn = {}
 		hbonds = {}
 		for framecoord in self.trajcoord:
-			hbondn, log, molids = hbondmolgrp(self.trajprof, framecoord, moltypeA, moltypeB)
+			hbondn, orglog, molids = hbondmolgrp(self.trajprof, framecoord, moltypeA, moltypeB)
 			frame_hbondn = sum(hbondn)
 			if frame_hbondn > 0:
-				print("<frame %d>" % framen)
-				print(frametitle)
-				for line in log:
-					print(line)
+				log.append("<frame %d>" % framen)
+				log.append(frametitle)
+				log.extend(orglog)
 			tothbondn.update({framen:frame_hbondn})
 			hbonds.update({framen:molids})
-			# Counting of frames start from 0
 			framen += 1
-		print('{0:>6}'.format("frames") + " | " + '{0:>6}'.format("hbondn"))
-		for i in range(self.trajn):
-			print('{0:>6}'.format(i) + " | " + '{0:>6}'.format(tothbondn.get(i)))
+		log.append('{0:>6}'.format("frames") + " | " + '{0:>6}'.format("hbondn"))
+		for i in range(self.trajstartn, self.trajendn + 1):
+			log.append('{0:>6}'.format(i) + " | " + '{0:>6}'.format(tothbondn.get(i)))
 		return tothbondn, hbonds
+
 	# Extract some molecules out of one frame
-	def write(self, frameid, molid):
+	def writeNewFrame(self, frameid, molid):
 		molid = list(set(molid))
 		molid.sort()
-		if isinstance(frameid, int) and frameid < self.trajn and ((isinstance(molid, int) and molid in self.trajprof.keys()) or (isinstance(molid, (tuple, list)) and all([v in self.trajprof.keys() for v in molid]))):
+		if not self.checkFrameID(frameid) or not self.checkMolIDList(molid):
+			raise ValueError("Wrong parameters. Function writeNewFrame expects two parameters, the former one to be the selected frame ID and the latter one to be an ID list (or tuple) for the wanted molecule(s).")
+		molmatrix = {}
+		framecoord = self.trajcoord[frameid]
+		moln = 0
+		# Reconstruct the molecular matrix
+		for i in molid:
+			moln += 1
+			molprof = self.trajprof.get(i)
+			mol = {"name":molprof.get("name"), "atom":molprof.get("atom")}
+			mol.update({"coordinate":np.vstack([framecoord[l-1] for l in molprof.get("atomid")])})
+			molmatrix.update({moln:mol})
+		molmatrix2pdb(molmatrix, "newframe%d.pdb" % frameid)
+
+	def writeGroups(self, pairs, filename):
+		# pairs should be a tuple list
+		# each tuple has two elements, the former one should be frame ID, and the latter one should be molecular ID
+		if (isinstance(pairs, list) and all([isinstance(p, tuple) and len(p) == 2 and self.checkFrameID(p[0]) and self.checkMolIDList(p[1]) for p in pairs])):
 			molmatrix = {}
-			framecoord = self.trajcoord[frameid]
 			moln = 0
-			# Reconstruct the molecular matrix
-			for i in molid:
-				moln += 1
-				molprof = self.trajprof.get(i)
-				mol = {"name":molprof.get("name"), "atom":molprof.get("atom")}
-				mol.update({"coordinate":np.vstack([framecoord[l-1] for l in molprof.get("atomid")])})
-				molmatrix.update({moln:mol})
-			molmatrix2pdb(molmatrix).write("newframe%d.pdb" %frameid)
+			for pair in pairs:
+				frameid = pair[0]
+				molid = pair[1]
+				for i in molid:
+					moln += 1
+					molprof = self.trajprof.get(i)
+					mol = {"name":molprof.get("name"), "atom":molprof.get("atom")}
+					mol.update({"coordinate":np.vstack([self.trajcoord[frameid][l-1] for l in molprof.get("atomid")])})
+					molmatrix.update({moln:mol})
+			molmatrix2pdb(molmatrix, "%s.pdb" % filename)
 		else:
-			raise ValueError("Wrong parameters. Function write expects two parameters, the former should be id for the frame and the latter should be either an id for the molecular matrix or a tuple or list for several ids.")
+			raise ValueError("Wrong parameters. Function writeGroups expects two parameters, the former one to be a tuple list in which each element should be a pack of frame ID and molecular ID list and the latter one to be the wanted file name without suffix.")

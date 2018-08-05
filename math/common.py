@@ -1,3 +1,4 @@
+import math
 import numpy as np
 
 # Attention: extend should be greater than 1
@@ -63,7 +64,29 @@ def fitplane(pts):
     else:
         raise ValueError("Unsupported parameter given for plane function in function fitplane from module gromacs.")
 
+# Attention: axis vector must be a unit vector
+# OR, the rotation matrix cannot be a unitary matrix
 def rotate(vector, axis, cosang, sinang):
+	axis = axis / math.sqrt(axis.dot(axis))
 	x, y, z = axis
 	rotmatrix = (1-cosang)*np.outer(axis, axis) + sinang*np.array([[0, -z, y], [z, 0, -x], [-y, x, 0]]) + cosang*np.eye(3)
 	return np.dot(rotmatrix, vector)
+
+def rotateMatrix(axis, cosang, sinang):
+	axis = axis / math.sqrt(axis.dot(axis))
+	x, y, z = axis
+	return (1-cosang)*np.outer(axis, axis) + sinang*np.array([[0, -z, y], [z, 0, -x], [-y, x, 0]]) + cosang*np.eye(3)
+
+def convertSeconds(timeLength):
+	timeLength = round(timeLength)
+	if (timeLength < 60):
+		return str(timeLength) + " sec"
+	elif (timeLength < 3600):
+		minValue = timeLength // 60
+		secValue = timeLength % 60
+		return str(minValue) + " min " + str(secValue) + " sec"
+	else:
+		hourValue = timeLength // 3600
+		minValue = (timeLength % 3600) // 60
+		secValue = (timeLength % 3600) % 60
+		return str(hourValue) + " hour " + str(minValue) + " min " + str(secValue) + " sec"
