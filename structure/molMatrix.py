@@ -38,7 +38,7 @@ def pdb2molmatrix(pdbpath, maxsize = 209715200):
 					atom.append(line_data.get("atom_name"))
 					coordinate.append([line_data.get("coordinate_x")/10, line_data.get("coordinate_y")/10, line_data.get("coordinate_z")/10])
 					# No velocity data in pdb file
-					velocity = [[0., 0., 0.]]
+					velocity.append([0., 0., 0.])
 					former = (line_data.get("residue_sequence_number"), line_data.get("residual_name"))
 			# Complete the last molecular matrix
 			mol_matrix.update({"atom":atom, "coordinate":numpyArray(coordinate), "velocity":numpyArray(velocity)})
