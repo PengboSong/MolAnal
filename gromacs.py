@@ -151,9 +151,12 @@ class TrajAnalysis(object):
 		self.trajn = 0
 		self.atomn = 0
 		self.moln = 0
+		self.rmsdMatrix = np.array([])
 
 		self._savePath = "."
 		self._loadPath = "."
+
+		self.__rmsdMatrixCalc = False
 
 	def getSavePath(self):
 		return self._savePath
@@ -179,6 +182,10 @@ class TrajAnalysis(object):
 		self.trajendn = 0
 		self.atomn = 0
 		self.moln = 0
+		self.rmsdMatrix = np.array([])
+
+		# Reset Flags
+		self.__rmsdMatrixCalc = False
 
 	def listCommand(self):
 		cmdList = [x for x in dir(self) if not x.startswith("_") and callable(getattr(self, x))]
@@ -259,6 +266,8 @@ class TrajAnalysis(object):
 			sys.stdout.flush()
 		sys.stdout.write(setProgressBar(100, 100))
 		sys.stdout.write("\n[Info] All File have loaded successfully.\r\n")
+
+		self.rmsdMatrix = np.zeros((self.trajn, self.trajn))
 
 	def writeLog(self, name, log, suffix = ".txt"):
 		if not isinstance(name, str) or not (isinstance(log, (tuple, list)) and all([isinstance(l, str) for l in log])):
@@ -484,16 +493,26 @@ class TrajAnalysis(object):
 
 		self.writeLog("rmsd_mol", log)
 
-	def clusterSingleLinkage(self, cutoff):
+	def checkRmsdMatrixCalc(self):
+		return self.__rmsdMatrixCalc
+
+	def concRmsdMatrix(self):
+		# Check shape of RMSD matrix
+		if self.rmsdMatrix.ndim == 2 and self.rmsdMatrix.shape[0] == self.atomn and self.rmsdMatrix.shape[1] == self.atomn:
+			pass
+		else:
+			self.rmsdMatrix = np.zeros((self.atomn, self.atomn))
+
 		# Construct RMSD Matrix
-		rmsdMatrix = np.zeros((self.trajn, self.trajn))
+
+		# TODO: change weight factor
 		weightFactor = np.ones(self.atomn)
 		startTime = time.time()
 		sys.stdout.write("[Info] Start calculating RMSD matrix.\n")
 		for i in range(self.trajn - 1):
 			for j in range(i + 1, self.trajn):
-				rmsdMatrix[i][j] = rmsdMol(self.trajcoord[i], self.trajcoord[j], weightFactor)
-				rmsdMatrix[j][i] = rmsdMatrix[i][j]
+				self.rmsdMatrix[i][j] = rmsdMol(self.trajcoord[i], self.trajcoord[j], weightFactor)
+				self.rmsdMatrix[j][i] = self.rmsdMatrix[i][j]
 			sys.stdout.write(setProgressBar(100, round((i / self.trajn) * 100)))
 			sys.stdout.flush()
 		endTime = time.time()
@@ -501,32 +520,34 @@ class TrajAnalysis(object):
 		sys.stdout.write("\n[Info] RMSD matrix calculation normally ends.\r\n")
 		print("[Info] Total time usage = %s." % convertSeconds(endTime - startTime))
 
-		rmsdLog = [";".join(['{0:>6.3f}'.format(i) for i in r]) for r in rmsdMatrix]
+		rmsdLog = [";".join(['{0:>6.3f}'.format(i) for i in r]) for r in self.rmsdMatrix]
 
-		# Cluster
-		clusters = [[0 + self.trajstartn]]
-		for i in range(1, self.trajn):
-			newGroupFlag = True
-			for group in clusters:
-				# rmsdMatrix index equals to frame index minus start frame index, start from 0
-				if all([rmsdMatrix[i][g - self.trajstartn] < cutoff for g in group]):
-					group.append(i + self.trajstartn)
-					newGroupFlag = False
-					break
-			if newGroupFlag is True:
-				clusters.append([i + self.trajstartn])
+		self.writeLog("rmsd_matrix", rmsdLog, ".csv")
+
+		self.__rmsdMatrixCalc = True
+
+	def clusterSingleLinkage(self, cutoff):
+		if self.checkRmsdMatrixCalc() is False:
+			self.concRmsdMatrix()
+
+		from gmx.math.clust import *
+
+		cindex, clust = renumCluster(
+			linkStructure(
+				self.atomn,
+				cutoff,
+				reshapeRmsdMatrix(self.atomn, self.rmsdMatrix)
+			)
+		)
 
 		titleLine = '{0:>6}'.format("Groupn") + " | " + '{0:>24}'.format("Group members (Framen)")
 		log = [titleLine]
 		groupn = 0
-		for group in clusters:
+		for group in clust:
 			groupn += 1
 			log.append('{0:>6}'.format(groupn) + " | " + ', '.join([str(g) for g in group]))
 
 		self.writeLog("cluster_single_linkage", log)
-		self.writeLog("cluster_rmsd_matrix", rmsdLog, ".csv")
-
-		return rmsdMatrix
 
 	def hbondgrp(self, moltypeA, moltypeB):
 		def hbondmolgrp(prof, framecoord, moltypeA, moltypeB):
