@@ -152,11 +152,13 @@ class TrajAnalysis(object):
 		self.atomn = 0
 		self.moln = 0
 		self.rmsdMatrix = np.array([])
+		self.weightFactor = np.array([])
 
 		self._savePath = "."
 		self._loadPath = "."
 
 		self.__rmsdMatrixCalc = False
+		self.__outWeightFactor = False
 
 	def getSavePath(self):
 		return self._savePath
@@ -183,9 +185,11 @@ class TrajAnalysis(object):
 		self.atomn = 0
 		self.moln = 0
 		self.rmsdMatrix = np.array([])
+		self.weightFactor = np.array([])
 
 		# Reset Flags
 		self.__rmsdMatrixCalc = False
+		self.__outWeightFactor = False
 
 	def listCommand(self):
 		cmdList = [x for x in dir(self) if not x.startswith("_") and callable(getattr(self, x))]
@@ -230,8 +234,6 @@ class TrajAnalysis(object):
 				return None
 
 		# Initialize
-		self.trajprof = {}
-		self.trajcoord = []
 		self.trajn = end - start + 1
 		self.trajstartn = start
 		self.trajendn = end
@@ -268,6 +270,7 @@ class TrajAnalysis(object):
 		sys.stdout.write("\n[Info] All File have loaded successfully.\r\n")
 
 		self.rmsdMatrix = np.zeros((self.trajn, self.trajn))
+		self.weightFactor = np.zeros((self.trajn,))
 
 	def writeLog(self, name, log, suffix = ".txt"):
 		if not isinstance(name, str) or not (isinstance(log, (tuple, list)) and all([isinstance(l, str) for l in log])):
@@ -492,6 +495,27 @@ class TrajAnalysis(object):
 			log.append('{0:>6}'.format(framen) + " | " + '{0:>8.3f}'.format(rmsdv))
 
 		self.writeLog("rmsd_mol", log)
+
+	def loadWeightFactor(self):
+		# TODO
+		pass
+
+	def setWeightFactor(self):
+		rightFactor = False
+		while (rightFactor is False):
+			factorLine = input("Enter weighting factors for this trajectory: ")
+			factors = factorLine.strip().split()
+			if len(factors) != self.atomn:
+				rightFactor = False
+			else:
+				rightFactor = True
+				for i in factors:
+					try:
+						float(i)
+					except Exception as e:
+						rightFactor = False
+						break
+		self.weightFactor = np.array(factors)
 
 	def checkRmsdMatrixCalc(self):
 		return self.__rmsdMatrixCalc
