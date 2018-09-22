@@ -19,7 +19,7 @@ def reshapeRmsdMatrix(atomn, rmsdMatrix):
 def linkStructure(atomn, cutoff, rmsdSequence):
     cluster = newCluster(atomn)
     sthChangeStatus = True
-    while (sthChange is True):
+    while (sthChangeStatus is True):
         sthChangeStatus = False
         for item in rmsdSequence:
             if item.get("dist") < cutoff:

@@ -7,12 +7,12 @@ import time
 from gmx.inputFunctions import convert_input_type
 from gmx.io.log import *
 from gmx.structure.molMatrix import *
-from gmx.math.common import cluster
-from gmx.math.common import fitplane
-from gmx.math.common import rotate
-from gmx.math.common import convertSeconds
+
+from gmx.math.clust import newCluster, reshapeRmsdMatrix, linkStructure, renumCluster
+from gmx.math.common import cluster, fitplane, rotate, convertSeconds
 from gmx.math.hbond import hbondmol
 from gmx.math.rmsd import rmsdMol
+from gmx.math.image import array2image, writeImage
 
 from custom.general import setProgressBar
 
@@ -496,9 +496,30 @@ class TrajAnalysis(object):
 
 		self.writeLog("rmsd_mol", log)
 
-	def loadWeightFactor(self):
-		# TODO
-		pass
+	def useOutWeightFactor(self):
+		return self.__outWeightFactor
+
+	def loadWeightFactor(self, file):
+		rightFactor = False
+		with open(file, "r") as f:
+			factorLine = f.readline().split()
+			if len(factors) != self.atomn:
+				rightFactor = False
+			else:
+				rightFactor = True
+				for i in factorLine:
+					try:
+						float(i)
+					except Exception as e:
+						rightFactor = False
+						break
+
+		if rightFactor is True:
+			factors = [float(i) for i in factorLine]
+			self.weightFactor = np.array(factors)
+			self.__outWeightFactor = True
+		else:
+			self.__outWeightFactor = False
 
 	def setWeightFactor(self):
 		rightFactor = False
@@ -517,20 +538,27 @@ class TrajAnalysis(object):
 						break
 		self.weightFactor = np.array(factors)
 
+		self.__outWeightFactor = True
+
 	def checkRmsdMatrixCalc(self):
 		return self.__rmsdMatrixCalc
 
 	def concRmsdMatrix(self):
 		# Check shape of RMSD matrix
-		if self.rmsdMatrix.ndim == 2 and self.rmsdMatrix.shape[0] == self.atomn and self.rmsdMatrix.shape[1] == self.atomn:
+		if self.rmsdMatrix.ndim == 2 and self.rmsdMatrix.shape[0] == self.trajn and self.rmsdMatrix.shape[1] == self.trajn:
 			pass
 		else:
-			self.rmsdMatrix = np.zeros((self.atomn, self.atomn))
+			self.rmsdMatrix = np.zeros((self.trajn, self.trajn))
 
 		# Construct RMSD Matrix
 
-		# TODO: change weight factor
-		weightFactor = np.ones(self.atomn)
+		# change weight factor
+		if (self.useOutWeightFactor() is True):
+			weightFactor = self.weightFactor
+		else:
+			weightFactor = np.ones(self.atomn)
+
+		# Start Calculation
 		startTime = time.time()
 		sys.stdout.write("[Info] Start calculating RMSD matrix.\n")
 		for i in range(self.trajn - 1):
@@ -550,17 +578,22 @@ class TrajAnalysis(object):
 
 		self.__rmsdMatrixCalc = True
 
+		# RMSD matrix image
+		writeImage(
+			array2image(self.rmsdMatrix, (self.trajn, self.trajn), colorMap = True),
+			"rmsdMatrix",
+			self.getSavePath()
+		)
+
 	def clusterSingleLinkage(self, cutoff):
 		if self.checkRmsdMatrixCalc() is False:
 			self.concRmsdMatrix()
 
-		from gmx.math.clust import *
-
 		cindex, clust = renumCluster(
 			linkStructure(
-				self.atomn,
+				self.trajn,
 				cutoff,
-				reshapeRmsdMatrix(self.atomn, self.rmsdMatrix)
+				reshapeRmsdMatrix(self.trajn, self.rmsdMatrix)
 			)
 		)
 

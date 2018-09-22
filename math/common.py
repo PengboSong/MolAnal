@@ -67,9 +67,7 @@ def fitplane(pts):
 # Attention: axis vector must be a unit vector
 # OR, the rotation matrix cannot be a unitary matrix
 def rotate(vector, axis, cosang, sinang):
-	axis = axis / math.sqrt(axis.dot(axis))
-	x, y, z = axis
-	rotmatrix = (1-cosang)*np.outer(axis, axis) + sinang*np.array([[0, -z, y], [z, 0, -x], [-y, x, 0]]) + cosang*np.eye(3)
+	rotmatrix = rotateMatrix(axis, cosang, sinang)
 	return np.dot(rotmatrix, vector)
 
 def rotateMatrix(axis, cosang, sinang):
