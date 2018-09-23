@@ -5,16 +5,17 @@ import numpy as np
 import time
 
 from gmx.inputFunctions import convert_input_type
-from gmx.io.log import *
-from gmx.structure.molMatrix import *
+from gmx.io.log import readlog, readxvg
+from gmx.structure.molMatrix import molmatrix2pdb, pdb2molmatrix
+from gmx.structure.rmsdMatrix import checkRmsdMatrix, upperRmsdMatrix, reshapeRmsdMatrix
 
-from gmx.math.clust import newCluster, reshapeRmsdMatrix, linkStructure, renumCluster
+from gmx.math.clust import newCluster, linkStructure, renumCluster
 from gmx.math.common import cluster, fitplane, rotate, convertSeconds
 from gmx.math.hbond import hbondmol
 from gmx.math.rmsd import rmsdMol
 from gmx.math.image import array2image, writeImage
 
-from custom.general import setProgressBar
+from custom.general import listFiles, setProgressBar
 
 class Moledit(object):
 	def __init__(self, pdbfile):
@@ -156,6 +157,7 @@ class TrajAnalysis(object):
 
 		self._savePath = "."
 		self._loadPath = "."
+		self._workPath = "."
 
 		self.__rmsdMatrixCalc = False
 		self.__outWeightFactor = False
@@ -176,6 +178,14 @@ class TrajAnalysis(object):
 		else:
 			print("[Error] Invalid path. The given path should be a existing directory.")
 
+	def getWorkPath(self):
+		return self._workPath
+	def setWorkPath(self, path):
+		if os.path.isdir(path):
+			self._workPath = path
+		else:
+			print("[Error] Invalid path. The given path should be a existing directory.")
+
 	def clearAll(self):
 		self.trajprof = {}
 		self.trajcoord = []
@@ -190,6 +200,136 @@ class TrajAnalysis(object):
 		# Reset Flags
 		self.__rmsdMatrixCalc = False
 		self.__outWeightFactor = False
+
+	def useOutWeightFactor(self):
+		return self.__outWeightFactor
+
+	def checkRmsdMatrixCalc(self):
+		return self.__rmsdMatrixCalc
+
+	def checkAtomID(self, atomID):
+		if isinstance(atomID, int) and atomID <= self.atomn:
+			return True
+		else:
+			return False
+	def checkAtomIDList(self, atomIDList):
+		if isinstance(atomIDList, (tuple, list)) and all([self.checkAtomID(a) for a in atomIDList]):
+			return True
+		else:
+			return False
+
+	def checkMolID(self, molID):
+		if isinstance(molID, int) and molID <= self.moln:
+			return True
+		else:
+			return False
+	def checkMolIDList(self, molIDList):
+		if isinstance(molIDList, (tuple, list)) and all([self.checkMolID(m) for m in molIDList]):
+			return True
+		else:
+			return False
+
+	def checkFrameID(self, frameID):
+		if isinstance(frameID, int) and self.trajstartn <= frameID <= self.trajendn:
+			return True
+		else:
+			return False
+	def checkFrameIDList(self, frameIDList):
+		if isinstance(frameIDList, (tuple, list)) and all([self.checkMolID(f) for f in frameIDList]):
+			return True
+		else:
+			return False
+
+	def loadWeightFactor(self):
+		rightFactor = False
+		file = listFiles(None, (".txt", ".csv", ".log"), self.getWorkPath())
+		with open(file, "r") as f:
+			factorLine = f.readline().strip().split()
+			if len(factors) != self.atomn:
+				rightFactor = False
+			else:
+				rightFactor = True
+				for i in factorLine:
+					try:
+						float(i)
+					except Exception as e:
+						rightFactor = False
+						break
+
+		if rightFactor is True:
+			factors = [float(i) for i in factorLine]
+			self.weightFactor = np.array(factors)
+			self.__outWeightFactor = True
+		else:
+			self.__outWeightFactor = False
+
+	def setWeightFactor(self):
+		rightFactor = False
+		while (rightFactor is False):
+			factorLine = input("Enter weighting factors for this trajectory: ")
+			factors = factorLine.strip().split()
+			if len(factors) != self.atomn:
+				rightFactor = False
+			else:
+				rightFactor = True
+				for i in factors:
+					try:
+						float(i)
+					except Exception as e:
+						rightFactor = False
+						break
+		factors = [float(i) for i in factors]
+		self.weightFactor = np.array(factors)
+
+		self.__outWeightFactor = True
+
+	def loadRmsdMatrix(self):
+		matrixFile = listFiles(None, ".csv", self.getWorkPath())
+
+		matrix = []
+		with open(matrixFile) as f:
+			rightFormat = True
+			columnN = -1
+			for line in f.readlines():
+				nums = []
+				initline = line.strip().split(";")
+
+				# Check columns number
+				if columnN < 0:
+					columnN = len(initline)
+				elif columnN != len(initline):
+					rightFormat = False
+					break
+
+				# Check whether each term in line is a real number
+				for i in initline:
+					try:
+						n = float(i)
+					except Exception as e:
+						rightFormat = False
+						break
+					else:
+						nums.append(n)
+				if rightFormat is True:
+					matrix.append(nums)
+				else:
+					break
+
+		if rightFormat is True:
+			matrix = np.array(matrix)
+			if checkRmsdMatrix(matrix):
+				self.rmsdMatrix = matrix
+				self.trajn = matrix.shape[0]
+				self.__rmsdMatrixCalc = True
+
+				upperHalf = upperRmsdMatrix(self.rmsdMatrix)
+				print("[Info] Minimum RMSD Value = %8.3f." % np.min(upperHalf))
+				print("[Info] Maximum RMSD Value = %8.3f." % np.max(upperHalf))
+				print("[Info] Average RMSD Value = %8.3f." % np.average(upperHalf))
+			else:
+				print("[Error] Wrong matrix file format. Maybe something is missing in the given matrix file. Please check your original matrix file.")
+		else:
+			print("[Error] Incompatible matrix file format.")
 
 	def listCommand(self):
 		cmdList = [x for x in dir(self) if not x.startswith("_") and callable(getattr(self, x))]
@@ -281,38 +421,6 @@ class TrajAnalysis(object):
 			fileName = name + "_" + timeFormat + suffix
 			with open(os.path.join(self._savePath, fileName), "w") as f:
 				f.writelines(line + '\n' for line in log)
-
-	def checkAtomID(self, atomID):
-		if isinstance(atomID, int) and atomID <= self.atomn:
-			return True
-		else:
-			return False
-	def checkAtomIDList(self, atomIDList):
-		if isinstance(atomIDList, (tuple, list)) and all([self.checkAtomID(a) for a in atomIDList]):
-			return True
-		else:
-			return False
-
-	def checkMolID(self, molID):
-		if isinstance(molID, int) and molID <= self.moln:
-			return True
-		else:
-			return False
-	def checkMolIDList(self, molIDList):
-		if isinstance(molIDList, (tuple, list)) and all([self.checkMolID(m) for m in molIDList]):
-			return True
-		else:
-			return False
-	def checkFrameID(self, frameID):
-		if isinstance(frameID, int) and self.trajstartn <= frameID <= self.trajendn:
-			return True
-		else:
-			return False
-	def checkFrameIDList(self, frameIDList):
-		if isinstance(frameIDList, (tuple, list)) and all([self.checkMolID(f) for f in frameIDList]):
-			return True
-		else:
-			return False
 
 	def molCenter(self, frameID, molID):
 		atomIDList = self.trajprof.get(molID).get("atomid")
@@ -496,53 +604,6 @@ class TrajAnalysis(object):
 
 		self.writeLog("rmsd_mol", log)
 
-	def useOutWeightFactor(self):
-		return self.__outWeightFactor
-
-	def loadWeightFactor(self, file):
-		rightFactor = False
-		with open(file, "r") as f:
-			factorLine = f.readline().split()
-			if len(factors) != self.atomn:
-				rightFactor = False
-			else:
-				rightFactor = True
-				for i in factorLine:
-					try:
-						float(i)
-					except Exception as e:
-						rightFactor = False
-						break
-
-		if rightFactor is True:
-			factors = [float(i) for i in factorLine]
-			self.weightFactor = np.array(factors)
-			self.__outWeightFactor = True
-		else:
-			self.__outWeightFactor = False
-
-	def setWeightFactor(self):
-		rightFactor = False
-		while (rightFactor is False):
-			factorLine = input("Enter weighting factors for this trajectory: ")
-			factors = factorLine.strip().split()
-			if len(factors) != self.atomn:
-				rightFactor = False
-			else:
-				rightFactor = True
-				for i in factors:
-					try:
-						float(i)
-					except Exception as e:
-						rightFactor = False
-						break
-		self.weightFactor = np.array(factors)
-
-		self.__outWeightFactor = True
-
-	def checkRmsdMatrixCalc(self):
-		return self.__rmsdMatrixCalc
-
 	def concRmsdMatrix(self):
 		# Check shape of RMSD matrix
 		if self.rmsdMatrix.ndim == 2 and self.rmsdMatrix.shape[0] == self.trajn and self.rmsdMatrix.shape[1] == self.trajn:
@@ -572,6 +633,11 @@ class TrajAnalysis(object):
 		sys.stdout.write("\n[Info] RMSD matrix calculation normally ends.\r\n")
 		print("[Info] Total time usage = %s." % convertSeconds(endTime - startTime))
 
+		upperHalf = upperRmsdMatrix(self.rmsdMatrix)
+		print("[Info] Minimum RMSD Value = %8.3f." % np.min(upperHalf))
+		print("[Info] Maximum RMSD Value = %8.3f." % np.max(upperHalf))
+		print("[Info] Average RMSD Value = %8.3f." % np.average(upperHalf))
+
 		rmsdLog = [";".join(['{0:>6.3f}'.format(i) for i in r]) for r in self.rmsdMatrix]
 
 		self.writeLog("rmsd_matrix", rmsdLog, ".csv")
@@ -593,7 +659,7 @@ class TrajAnalysis(object):
 			linkStructure(
 				self.trajn,
 				cutoff,
-				reshapeRmsdMatrix(self.trajn, self.rmsdMatrix)
+				reshapeRmsdMatrix(self.rmsdMatrix)
 			)
 		)
 

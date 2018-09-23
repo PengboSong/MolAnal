@@ -4,7 +4,7 @@ def checkCoordinateMatrix(matrix):
     acceptableDataType = ["int32", "int64", "float64", "float128"]
     errorInfo = ""
     if isinstance(matrix, ndarray):
-        if matrix.dtype in acceptableDataType:
+        if str(matrix.dtype) in acceptableDataType:
             if matrix.ndim == 2:
                 if matrix.shape[1] == 3:
                     return True, errorInfo
@@ -25,7 +25,7 @@ def checkLineMatrix(matrix):
     acceptableDataType = ["int32", "int64", "float64", "float128"]
     errorInfo = ""
     if isinstance(matrix, ndarray):
-        if matrix.dtype in acceptableDataType:
+        if str(matrix.dtype) in acceptableDataType:
             if matrix.ndim == 1:
                 return True, errorInfo
             else:

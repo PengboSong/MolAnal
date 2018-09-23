@@ -4,18 +4,6 @@ def newCluster(atomn):
         cluster.append({"conf":i, "clust":i})
     return cluster
 
-def reshapeRmsdMatrix(atomn, rmsdMatrix):
-    rmsdSequence = []
-    if isinstance(atomn, int) and rmsdMatrix.ndim == 2 and rmsdMatrix.shape[0] == atomn and rmsdMatrix.shape[1] == atomn:
-        for i in range(atomn):
-            for j in range(i + 1, atomn):
-                rmsdSequence.append({"x":i, "y":j, "dist":rmsdMatrix[i][j]})
-        rmsdSequence.sort(key = lambda obj: obj.get("dist"))
-        return rmsdSequence
-    else:
-        raise ValueError("Invalid format RMSD matrix received.")
-        return None
-
 def linkStructure(atomn, cutoff, rmsdSequence):
     cluster = newCluster(atomn)
     sthChangeStatus = True
