@@ -11,7 +11,7 @@ from gmx.structure.rmsdMatrix import checkRmsdMatrix, upperRmsdMatrix, reshapeRm
 
 from gmx.math.clust import newCluster, linkStructure, renumCluster
 from gmx.math.common import cluster, fitplane, rotate, convertSeconds
-from gmx.math.hbond import hbondmol
+from gmx.math.hbond import hbondmolgrp
 from gmx.math.rmsd import rmsdMol
 from gmx.math.image import array2image, writeImage
 
@@ -672,38 +672,7 @@ class TrajAnalysis(object):
 
 		self.writeLog("cluster_single_linkage", log)
 
-	def hbondgrp(self, moltypeA, moltypeB):
-		def hbondmolgrp(prof, framecoord, moltypeA, moltypeB):
-			# Grouping
-			grp = cluster(prof)
-			# Initialize log and counting
-			log = []
-			hbondn = []
-			molids = []
-			for mola_id in grp.get(moltypeA):
-				for molb_id in grp.get(moltypeB):
-					mola = prof.get(mola_id)
-					molA = (
-						mola_id,
-						mola.get("name"),
-						mola.get("atom"),
-						np.vstack([framecoord[l-1] for l in mola.get("atomid")])
-					)
-					molb = prof.get(molb_id)
-					molB = (
-						molb_id,
-						molb.get("name"),
-						molb.get("atom"),
-						np.vstack([framecoord[l-1] for l in molb.get("atomid")])
-					)
-					mol_hbondn, mol_log = hbondmol(molA, molB)
-					hbondn.append(mol_hbondn)
-					log.extend(mol_log)
-					if mol_hbondn > 0:
-						molids.extend([mola_id, molb_id])
-			molids = list(set(molids))
-			molids.sort()
-			return hbondn, log, molids
+	def hbondgrp(self, moltypeA, moltypeB, lpdir = False):
 		# Check
 		profgrp = cluster(self.trajprof)
 		if moltypeA not in profgrp.keys() or moltypeB not in profgrp.keys():
@@ -711,26 +680,47 @@ class TrajAnalysis(object):
 		# Title
 		frametitle = '{0:>14}'.format("donor") + " | " + '{0:>14}'.format("hydro") + " | " + '{0:>14}'.format("acceptor") + " | " + '{0:>9}'.format("distance") + " | " + '{0:>6}'.format("angle")
 		log = []
+
+		# Start Calculation
+		startTime = time.time()
+		sys.stdout.write("[Info] Start identifying hydrogen bond.\n")
 		# Start Counting
 		# Counting at the end of the loop
 		framen = self.trajstartn
-		# Initialize dict
-		tothbondn = {}
-		hbonds = {}
+		frame_hbondns, frame_hbondmols = {}, {}
 		for framecoord in self.trajcoord:
-			hbondn, orglog, molids = hbondmolgrp(self.trajprof, framecoord, moltypeA, moltypeB)
+			sys.stdout.write(setProgressBar(100, round(((framen - self.trajstartn) / self.trajn) * 100)))
+			sys.stdout.flush()
+			hbondn, orglog, molids = hbondmolgrp(self.trajprof, framecoord, moltypeA, moltypeB, lpdir)
 			frame_hbondn = sum(hbondn)
+			frame_hbondns.update({framen: frame_hbondn})
 			if frame_hbondn > 0:
 				log.append("<frame %d>" % framen)
 				log.append(frametitle)
 				log.extend(orglog)
-			tothbondn.update({framen:frame_hbondn})
-			hbonds.update({framen:molids})
+				frame_hbondmols.update({framen: molids})
 			framen += 1
-		log.append('{0:>6}'.format("frames") + " | " + '{0:>6}'.format("hbondn"))
+		# Calculation ends
+		endTime = time.time()
+		sys.stdout.write(setProgressBar(100, 100))
+		sys.stdout.write("\n[Info] Hygrogen bond identification normally ends.\r\n")
+		print("[Info] Total time usage = %s." % convertSeconds(endTime - startTime))
+
+		if log:
+			self.writeLog("hbond_%s-%s" %(moltypeA.lower(), moltypeB.lower()), log)
+
+		hbondnlog = ['{0:>6}'.format("frames") + " | " + '{0:>6}'.format("hbondn")]
 		for i in range(self.trajstartn, self.trajendn + 1):
-			log.append('{0:>6}'.format(i) + " | " + '{0:>6}'.format(tothbondn.get(i)))
-		return tothbondn, hbonds
+			hbondnlog.append('{0:>6}'.format(i) + " | " + '{0:>6}'.format(frame_hbondns.get(i)))
+		self.writeLog("hbondsum_%s-%s" %(moltypeA.lower(), moltypeB.lower()), hbondnlog)
+
+		timeFormat = time.strftime("%Y%m%d_%H%M%S")
+		newFrameDir = os.path.join(self.getWorkPath(), "mols_%s-%s" %(moltypeA.lower(), moltypeB.lower())) + timeFormat
+		if os.mkdir(newFrameDir):
+			self.setWorkPath(newFrameDir)
+			for j in frame_hbondmols.keys():
+				self.writeNewFrame(j, frame_hbondmols.get(j))
+			self.setWorkPath(os.path.abspath(os.path.join(newFrameDir), ".."))
 
 	# Extract some molecules out of one frame
 	def writeNewFrame(self, frameid, molid):
@@ -748,7 +738,7 @@ class TrajAnalysis(object):
 			mol = {"name":molprof.get("name"), "atom":molprof.get("atom")}
 			mol.update({"coordinate":np.vstack([framecoord[l-1] for l in molprof.get("atomid")])})
 			molmatrix.update({moln:mol})
-		molmatrix2pdb(molmatrix, "newframe%d.pdb" % frameid)
+		molmatrix2pdb(molmatrix, os.path.join(self.getWorkPath(), "newframe%d.pdb" % frameid))
 
 	def writeGroups(self, pairs, filename):
 		# pairs should be a tuple list
@@ -765,6 +755,6 @@ class TrajAnalysis(object):
 					mol = {"name":molprof.get("name"), "atom":molprof.get("atom")}
 					mol.update({"coordinate":np.vstack([self.trajcoord[frameid][l-1] for l in molprof.get("atomid")])})
 					molmatrix.update({moln:mol})
-			molmatrix2pdb(molmatrix, "%s.pdb" % filename)
+			molmatrix2pdb(molmatrix, os.path.join(self.getWorkPath(), "%s.pdb" % filename))
 		else:
 			raise ValueError("Wrong parameters. Function writeGroups expects two parameters, the former one to be a tuple list in which each element should be a pack of frame ID and molecular ID list and the latter one to be the wanted file name without suffix.")
