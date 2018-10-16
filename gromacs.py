@@ -341,7 +341,7 @@ class TrajAnalysis(object):
 		def exit():
 			exitConfirm = input("Exit?(Y/N)").strip().upper()
 			while exitConfirm not in ("Y", "N"):
-				exitConfirm = input("Save modifications?(Y/N)").strip().upper()
+				exitConfirm = input("Exit?(Y/N)").strip().upper()
 			if exitConfirm == "Y":
 				return True
 			else:
@@ -357,6 +357,8 @@ class TrajAnalysis(object):
 					break
 			elif not hasattr(self, inputCmdList[0]):
 				print("[Info] Invalid command.")
+			elif inputCmdList[0] == "command":
+				print("[Info] Already in console mode.")
 			else:
 				try:
 					getattr(self, inputCmdList[0])(*([convert_input_type(x) for x in inputCmdList[1:]]))
@@ -435,7 +437,7 @@ class TrajAnalysis(object):
 	def distance(self, atomA, atomB):
 		# Check
 		if self.checkAtomID(atomB):
-			atomB = tuple(atomB)
+			atomB = [atomB]
 		if not self.checkAtomID(atomA) or not self.checkAtomIDList(atomB):
 			raise ValueError("Wrong parameters. Function distance expects the first parameter to be the central atom ID and the second one to be an ID list (or tuple) for pair atom(s).")
 
@@ -462,7 +464,7 @@ class TrajAnalysis(object):
 	def distanceMol(self, molid, atomid):
 		# Check
 		if self.checkAtomID(atomid):
-			atomid = tuple(atomid)
+			atomid = [atomid]
 		if not self.checkMolID(molid) or not self.checkAtomIDList(atomid):
 			raise ValueError("Wrong parameters. Function distance expects the first parameter to be the selected molecular ID and the second one to be an ID list (or tuple) for pair atom(s).")
 
@@ -486,7 +488,7 @@ class TrajAnalysis(object):
 	def location(self, atomid):
 		# Check
 		if self.checkAtomID(atomid):
-			atomid = tuple(atomid)
+			atomid = [atomid]
 		if not self.checkAtomIDList(atomid):
 			raise ValueError("Wrong parameters. Function atomLocation expects one parameter to be an ID list (or tuple) for selected atom(s).")
 
@@ -511,7 +513,7 @@ class TrajAnalysis(object):
 	def locationMol(self, molid):
 		# Check
 		if self.checkMolID(molid):
-			molid = tuple(molid)
+			molid = [molid]
 		if not self.checkMolIDList(molid):
 			raise ValueError("Wrong parameters. Function molLocation expects one parameter to be an ID list (or tuple) for selected molecule(s).")
 
@@ -663,8 +665,9 @@ class TrajAnalysis(object):
 			)
 		)
 
+		infoLine = "Method: Single Linkage, Cutoff: %.3f nm" % (cutoff)
 		titleLine = '{0:>6}'.format("Groupn") + " | " + '{0:>24}'.format("Group members (Framen)")
-		log = [titleLine]
+		log = [infoLine, titleLine]
 		groupn = 0
 		for group in clust:
 			groupn += 1
