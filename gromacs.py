@@ -15,7 +15,8 @@ from gmx.math.hbond import hbondmolgrp
 from gmx.math.rmsd import rmsdMol
 from gmx.math.image import array2image, writeImage
 
-from custom.general import listFiles, setProgressBar
+from custom.general import listFiles
+from custom.progressbar import ProgressBar
 
 class Moledit(object):
 	def __init__(self, pdbfile):
@@ -402,14 +403,13 @@ class TrajAnalysis(object):
 		# moln equals to total molecule number
 		self.moln = moln
 		# Only load coordinates data of each frame (including the first one) into a matrix (N*3)
-		sys.stdout.write("[Info] Start reading files.\n")
+		ManageLoad = ProgressBar(self.trajn)
+		ManageLoad.start("[Info] Start reading files.")
 		for i in range(self.trajstartn, self.trajendn + 1):
 			mols = pdb2molmatrix(framePath(i))
 			self.trajcoord.append(np.vstack([mol.get("coordinate") for mol in mols.values()]))
-			sys.stdout.write(setProgressBar(100, round((i / self.trajn) * 100)))
-			sys.stdout.flush()
-		sys.stdout.write(setProgressBar(100, 100))
-		sys.stdout.write("\n[Info] All File have loaded successfully.\r\n")
+			ManageLoad.forward(1)
+		ManageLoad.end("[Info] All File have loaded successfully.")
 
 		self.rmsdMatrix = np.zeros((self.trajn, self.trajn))
 		self.weightFactor = np.zeros((self.trajn,))
@@ -585,6 +585,35 @@ class TrajAnalysis(object):
 
 		self.writeLog("dist2plane_mol", log)
 
+	def dist2plane_mol_sign(self, molid, plane, reference_coord = (0., 0., 0.)):
+		# Check
+		if not self.checkMolID(molid) or not self.checkAtomIDList(plane):
+			raise ValueError("Wrong parameters. Function dist2planeMol expects the first parameter to be the selected molecular ID, the second one to be an ID list (or tuple) for atom(s) in the reference plane and the last one to be the selected atom ID that should be in the positive site.")
+		else:
+			if len(plane) < 3:
+				raise ValueError("Need at least 3 points to fit a plane.")
+		# Title
+		titleline = '{0:>6}'.format("frames") + " | " + '{0:>8}'.format("distance")
+		log = [titleline]
+		# Start Counting
+		framen = self.trajstartn - 1
+		for framecoord in self.trajcoord:
+			framen += 1
+			center = self.molCenterWithCoord(framecoord, molid)
+			# Function fitplane only accepts a package of at least three points' coordinate (better near a plane) in the form of either tuple or list, each element of the package should be a 1-dim 3-size numpy.ndarray object
+			plps = fitplane([framecoord[x - 1] for x in plane])	# Short of plane parameters
+			# Attention: plps should be a tuple with 4 elements, denoted as a, b, c, d. The plane equation should be ax+by+cz=0
+			plnormal = np.array(plps[0:3])
+			# Calculate reference distance value to determine the sign
+			reference_dist = (plnormal.dot(reference_coord) + plps[3])/math.sqrt(plnormal.dot(plnormal))
+			pldist = (plnormal.dot(center) + plps[3])/math.sqrt(plnormal.dot(plnormal))
+			# Different sign
+			if reference_dist * pldist < 0:
+				pldist = - pldist
+			log.append('{0:>6}'.format(framen) + " | " + '{0:>8.3f}'.format(pldist))
+
+			self.writeLog("dist2plane_mol_sign", log)
+
 	def rmsd(self, framen):
 		# Check
 		if not self.checkFrameID(framen):
@@ -623,16 +652,15 @@ class TrajAnalysis(object):
 
 		# Start Calculation
 		startTime = time.time()
-		sys.stdout.write("[Info] Start calculating RMSD matrix.\n")
+		ManageRMSD = ProgressBar(self.trajn - 1)
+		ManageRMSD.start("[Info] Start calculating RMSD matrix.")
 		for i in range(self.trajn - 1):
 			for j in range(i + 1, self.trajn):
 				self.rmsdMatrix[i][j] = rmsdMol(self.trajcoord[i], self.trajcoord[j], weightFactor)
 				self.rmsdMatrix[j][i] = self.rmsdMatrix[i][j]
-			sys.stdout.write(setProgressBar(100, round((i / self.trajn) * 100)))
-			sys.stdout.flush()
+			ManageRMSD.forward(1)
 		endTime = time.time()
-		sys.stdout.write(setProgressBar(100, 100))
-		sys.stdout.write("\n[Info] RMSD matrix calculation normally ends.\r\n")
+		ManageRMSD.end("[Info] RMSD matrix calculation normally ends.")
 		print("[Info] Total time usage = %s." % convertSeconds(endTime - startTime))
 
 		upperHalf = upperRmsdMatrix(self.rmsdMatrix)
@@ -686,14 +714,13 @@ class TrajAnalysis(object):
 
 		# Start Calculation
 		startTime = time.time()
-		sys.stdout.write("[Info] Start identifying hydrogen bond.\n")
+		ManageHbond = ProgressBar(self.trajn)
+		ManageHbond.start("[Info] Start identifying hydrogen bond.")
 		# Start Counting
 		# Counting at the end of the loop
 		framen = self.trajstartn
 		frame_hbondns, frame_hbondmols = {}, {}
 		for framecoord in self.trajcoord:
-			sys.stdout.write(setProgressBar(100, round(((framen - self.trajstartn) / self.trajn) * 100)))
-			sys.stdout.flush()
 			hbondn, orglog, molids = hbondmolgrp(self.trajprof, framecoord, moltypeA, moltypeB, lpdir)
 			frame_hbondn = sum(hbondn)
 			frame_hbondns.update({framen: frame_hbondn})
@@ -702,11 +729,11 @@ class TrajAnalysis(object):
 				log.append(frametitle)
 				log.extend(orglog)
 				frame_hbondmols.update({framen: molids})
+			ManageHbond.forward(1)
 			framen += 1
 		# Calculation ends
 		endTime = time.time()
-		sys.stdout.write(setProgressBar(100, 100))
-		sys.stdout.write("\n[Info] Hygrogen bond identification normally ends.\r\n")
+		ManageHbond.end("[Info] Hygrogen bond identification normally ends.")
 		print("[Info] Total time usage = %s." % convertSeconds(endTime - startTime))
 
 		if log:
