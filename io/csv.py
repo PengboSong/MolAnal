@@ -1,4 +1,4 @@
-from gmx.inputFunctions import convert_input_type
+from gmx.other.input_func import convert_input_type
 
 def readline_csv(line, split_symbol = ';', comment_symbol = '#'):
 	if not line.startswith(comment_symbol):

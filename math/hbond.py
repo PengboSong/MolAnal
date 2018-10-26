@@ -1,7 +1,7 @@
 import math
 import numpy as np
 
-from gmx.math.molecules import hbondlist, hbondlist_direction
+from gmx.chem.molecules import hbondlist, hbondlist_direction
 from gmx.math.common import cluster, fitplane, rotate
 
 global hbond_distance, hbond_degree, hbond_dir_degree

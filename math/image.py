@@ -1,8 +1,5 @@
-import os.path
-import time
-
+import os.path, imp, time
 import numpy as np
-import imp
 
 with_opencv_flag = False
 
