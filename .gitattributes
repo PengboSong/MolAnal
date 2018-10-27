@@ -1,2 +1,8 @@
 # Auto detect text files and perform LF normalization
-* text=auto
+*     text=auto
+
+# These files are text and should be normalized (crlf -> lf)
+*.py  text
+
+# These files are binary and normalization should not be performed
+*.pyc binary
