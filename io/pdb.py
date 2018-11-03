@@ -157,53 +157,53 @@ def pdb2mol_matrix(pdb_path, maxsize = 209715200):
 	return mols
 
 def pdb2gro(pdb_path, csv_path, gro_path, maxsize = 209715200):
-    # Initialize dict
-    data = {}
-    modif = {}
+	# Initialize dict
+	data = {}
+	modif = {}
 
-    # Load pdb file
+	# Load pdb file
 	if os.path.isfile(pdb_path) and os.path.splitext(pdb_path)[1] == ".pdb":
-	    with open(pdb_path, 'r') as f:
-	        row = 0
-	        for line in f.readlines(maxsize):
-	            row += 1
-	            if line[0:6] in ("ATOM  ", "HETATM"):
-	                line_data = readline_pdb(line, row)
-	                data.update({line_data.get("atom_serial_number"):line_data})
+		with open(pdb_path, 'r') as f:
+			row = 0
+			for line in f.readlines(maxsize):
+				row += 1
+				if line[0:6] in ("ATOM  ", "HETATM"):
+					line_data = readline_pdb(line, row)
+					data.update({line_data.get("atom_serial_number"):line_data})
 	else:
 		raise IOError("Can not load file %s. Expect a .pdb file." % pdb_path)
 
-    # Load csv file recording completion lines
+	# Load csv file recording completion lines
 	if os.path.isfile(csv_path) and os.path.splitext(csv_path)[1] == ".csv":
-	    with open(csv_path, 'r') as f:
-	        row = 0
-	        for line in f.readlines(maxsize):
-	            row += 1
-	            line_modif = readline_csv_spec(line, row)
-	            if line_modif:
-	                modif.update({line_modif.get("new_atom_serial_number"):line_modif})
+		with open(csv_path, 'r') as f:
+			row = 0
+			for line in f.readlines(maxsize):
+				row += 1
+				line_modif = readline_csv_spec(line, row)
+				if line_modif:
+					modif.update({line_modif.get("new_atom_serial_number"):line_modif})
 	else:
 		raise IOError("Can not load file %s. Expect a .csv file." % csv_path)
 
-    # Write parts
-    lxyz, lout = [], []
-    for newid in modif.keys():
-        modif_term = modif.get(newid)
-        out_term = data.get(modif_term.get("atom_serial_number")).copy()
-        out_term.update(modif_term)
-        out_term.update({"molecular_id":modif_term.get("residue_sequence_number")})
-        lout.append(out_term)
-        lxyz.append(out_term.get("coordinate"))
+	# Write parts
+	lxyz, lout = [], []
+	for newid in modif.keys():
+		modif_term = modif.get(newid)
+		out_term = data.get(modif_term.get("atom_serial_number")).copy()
+		out_term.update(modif_term)
+		out_term.update({"molecular_id":modif_term.get("residue_sequence_number")})
+		lout.append(out_term)
+		lxyz.append(out_term.get("coordinate"))
 
-    # Get the solvate box parameters
-    xbox, ybox, zbox = boxpara(np.array(lxyz))
-    with open(gro_path, 'w') as f:
-        # Default title
-        f.write("GROtesk MACabre and Sinister" + '\n')
-        # Total atom numbers
-        f.write('{0:>5}'.format(len(lout)) + '\n')
+	# Get the solvate box parameters
+	xbox, ybox, zbox = boxpara(np.array(lxyz))
+	with open(gro_path, 'w') as f:
+		# Default title
+		f.write("GROtesk MACabre and Sinister" + '\n')
+		# Total atom numbers
+		f.write('{0:>5}'.format(len(lout)) + '\n')
 		new_lines = []
-        for term in lout:
+		for term in lout:
 			this_x, this_y, this_z = term.get("coordinate")
 			term_line = '{0:>5}'.format(term.get("molecular_id") or " ")
 			term_line += '{0:<4}'.format(term.get("residual_name") or " ")
@@ -213,8 +213,8 @@ def pdb2gro(pdb_path, csv_path, gro_path, maxsize = 209715200):
 			term_line += '{0:>8.3f}'.format(this_x or " ") + '{0:>8.3f}'.format(this_y or " ") + '{0:>8.3f}'.format(this_z, '.3f') or " ")
 			new_lines.append(term_line)
 		f.writelines(line + '\n' for line in term_lines)
-        # Solvate box parameters
-        f.write('{0:>10.5f}'.format(xbox) + '{0:>10.5f}'.format(ybox) + '{0:>10.5f}'.format(zbox) + '\n')
+		# Solvate box parameters
+		f.write('{0:>10.5f}'.format(xbox) + '{0:>10.5f}'.format(ybox) + '{0:>10.5f}'.format(zbox) + '\n')
 
 def mol_matrix2pdb(mols, file_name = "frame"):
 	# Start counting

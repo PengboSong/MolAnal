@@ -31,38 +31,38 @@ def cluster(mols):
 # Function fitplane return four parameters: a, b, c, d. The equation of wanted plane is "ax+by+cz+d=0"
 def fitplane(pts):
 	# Use leastsq module from scipy to converge the least squared summation
-    from scipy.optimize import leastsq
+	from scipy.optimize import leastsq
 	# Function planeq is used for leastsq
 	# p should be a normal vector(to initialize) or objects can be converted to a vector
-    def planeq(p, x, y, z):
-        if isinstance(p, np.ndarray) and p.size == 3 and p.ndim == 1:
-            pass
-        elif isinstance(p, (tuple, list)) and len(p) == 3 and all([isinstance(v, (int, float)) for v in p]):
-            p = np.array(p)
-        else:
-            raise TypeError("Unsupported parameter given for plane equation.")
-        pt = np.array([x, y, z])
+	def planeq(p, x, y, z):
+		if isinstance(p, np.ndarray) and p.size == 3 and p.ndim == 1:
+			pass
+		elif isinstance(p, (tuple, list)) and len(p) == 3 and all([isinstance(v, (int, float)) for v in p]):
+			p = np.array(p)
+		else:
+			raise TypeError("Unsupported parameter given for plane equation.")
+		pt = np.array([x, y, z])
 		# CAN NOT use np.dot(pt, pt) to replace (x**2 + y**2 + z**2) - They are NOT equal
-        return (np.dot(p, pt))/np.sqrt((p.dot(p) * (x**2 + y**2 + z**2)))
-    if isinstance(pts, (tuple, list)) and len(pts) > 2 and all([isinstance(pt, np.ndarray) and pt.size == 3 and pt.ndim == 1 for pt in pts]):
+		return (np.dot(p, pt))/np.sqrt((p.dot(p) * (x**2 + y**2 + z**2)))
+	if isinstance(pts, (tuple, list)) and len(pts) > 2 and all([isinstance(pt, np.ndarray) and pt.size == 3 and pt.ndim == 1 for pt in pts]):
 		# Get the normal vector from the first three points
-        normal = np.cross(pts[1]-pts[0], pts[2]-pts[0])
-        a, b, c = normal
-        if len(pts) == 3:
+		normal = np.cross(pts[1]-pts[0], pts[2]-pts[0])
+		a, b, c = normal
+		if len(pts) == 3:
 			# When only three points are given, return the precise equation of the plane
-            d = -(normal*pts[0]).sum()
-            return a, b, c, d
-        else:
+			d = -(normal*pts[0]).sum()
+			return a, b, c, d
+		else:
 			# When more than three points are given, just return equation of a "close" plane
 			# adjustPoints is a N*3 matrix that each row equals to a vector from the center of N points to the point
-            adjustPoints = np.array(pts) - np.average(np.array(pts), axis=0)
+			adjustPoints = np.array(pts) - np.average(np.array(pts), axis=0)
 			# Transpose of adjustPoints is a 3*N matrix, three rows cooresponds to x, y, z, respectively
-            x, y, z = adjustPoints.transpose()
-            a, b, c = leastsq(planeq, normal, args=(x, y, z))[0]
-            d = -np.array([a, b, c]).dot(np.average(np.array(pts), axis=0))
-            return a, b, c, d
-    else:
-        raise ValueError("Unsupported parameter given for plane function in function fitplane from module gromacs.")
+			x, y, z = adjustPoints.transpose()
+			a, b, c = leastsq(planeq, normal, args=(x, y, z))[0]
+			d = -np.array([a, b, c]).dot(np.average(np.array(pts), axis=0))
+			return a, b, c, d
+	else:
+		raise ValueError("Unsupported parameter given for plane function in function fitplane from module gromacs.")
 
 # Attention: axis vector must be a unit vector
 # OR, the rotation matrix cannot be a unitary matrix

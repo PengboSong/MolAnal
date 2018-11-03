@@ -10,7 +10,7 @@ def readline_csv_spec(line, row):
 	assert isinstance(row, int), "Invalid row number."
 	assert isinstance(line, str), "Can not parse the given line at row %d." % row
 	# Newline; Oldline; AtomName; ResType; ResId; Occup; TempFactor; SegName
-    split_line = readline_csv(line)
+	split_line = readline_csv(line)
 	if isinstance(split_line, list) and len(split_line) == 8:
 		new_id, old_id, atom_name, res_type, res_id, occup, temp_factor, segment = split_line
 		assert is_int(new_id), "Term Newline at row %d column 1 is not an integer." % row

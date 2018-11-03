@@ -5,7 +5,7 @@ with_opencv_flag = False
 
 def check_opencv_module():
 	try:
-	    imp.find_module('cv2')
+		imp.find_module('cv2')
 	except ImportError:
 		with_opencv_flag = False
 	else:
