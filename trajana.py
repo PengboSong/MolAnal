@@ -238,20 +238,14 @@ class TrajAnalysis(object):
 			cmd = input(">>> ").strip()
 		input("Press any key to exit...")
 
-	def load(self, start, end, name, frametype = "pdb"):
-		def framePath(index):
-			if isinstance(index, int):
-				frameName = name + str(index) + "." + frametype
-				return os.path.join(self._loadPath, frameName)
-			else:
-				return None
+	def load(self, start, end, prefix = "frame", suffix = "pdb"):
 
 		# Initialize
 		self.trajn = end - start + 1
 		self.trajstartn = start
 		self.trajendn = end
 		# Load trajectory profile from the first frame(should end with number 0)
-		firstframe = load_as_mol_matrix(framePath(start))
+		firstframe = load_as_mol_matrix(os.path.join(self._loadPath, "%s%d.%s" % (prefix, start, suffix)))
 		# Remove coordinate and velocity terms
 		# Add atom id term for each atom, begin counting
 		# Atom ids would be count from 1
@@ -276,7 +270,7 @@ class TrajAnalysis(object):
 		ManageLoad = ProgressBar(self.trajn)
 		ManageLoad.start("[Info] Start reading files.")
 		for i in range(self.trajstartn, self.trajendn + 1):
-			mols = load_as_mol_matrix(framePath(i))
+			mols = load_as_mol_matrix(os.path.join(self._loadPath, "%s%d.%s" % (prefix, i, suffix)))
 			self.trajcoord.append(np.vstack([mol.get("coordinate") for mol in mols.values()]))
 			ManageLoad.forward(1)
 		ManageLoad.end("[Info] All File have loaded successfully.")
