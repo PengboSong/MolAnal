@@ -145,7 +145,7 @@ def gro2mol_matrix(gro_path, maxsize = 209715200):
 			mol_matrix.update({"atom":atom, "coordinate":np.array(coordinate), "velocity":np.array(velocity)})
 			mols.update({mol_id:mol_matrix})
 	else:
-		raise IOError(("Can not load file %s. Expect a .gro file." % gro_path)
+		raise IOError("Can not load file %s. Expect a .gro file." % gro_path)
 	return mols
 
 def atom_matrix2gro(atoms, file_name = "frame", write_velocity = False):

@@ -1,7 +1,7 @@
 import math
 import numpy as np
 
-from gmx.structure.coord_matrix import is_coord_matrix, is_vector
+from gmx.structure.matrix_shape import is_coord_matrix, is_vector
 
 def rmsd(ref_mat, mol_mat, weight_factor):
 	# lambda function calculate length of random dimensions vector

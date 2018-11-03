@@ -210,7 +210,7 @@ def pdb2gro(pdb_path, csv_path, gro_path, maxsize = 209715200):
 			term_line += '{0:1}'.format(term.get("chain_identifier") or " ")
 			term_line += '{0:>4}'.format(term.get("atom_name") or " ")
 			term_line += '{0:>5}'.format(term.get("atom_serial_number") or " ")
-			term_line += '{0:>8.3f}'.format(this_x or " ") + '{0:>8.3f}'.format(this_y or " ") + '{0:>8.3f}'.format(this_z, '.3f') or " ")
+			term_line += '{0:>8.3f}'.format(this_x or " ") + '{0:>8.3f}'.format(this_y or " ") + '{0:>8.3f}'.format(this_z or " ")
 			new_lines.append(term_line)
 		f.writelines(line + '\n' for line in term_lines)
 		# Solvate box parameters
