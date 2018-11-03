@@ -4,7 +4,6 @@ import numpy as np
 from gmx.chem.molecules import hbondlist, hbondlist_direction
 from gmx.math.common import cluster, fitplane, rotate
 
-global hbond_distance, hbond_degree, hbond_dir_degree
 hbond_distance = 0.35
 hbond_degree = 30
 hbond_dir_degree = 30

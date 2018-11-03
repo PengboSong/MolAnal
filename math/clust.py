@@ -1,11 +1,11 @@
-def newCluster(atomn):
+def new_cluster(atomn):
     cluster = []
     for i in range(atomn):
         cluster.append({"conf":i, "clust":i})
     return cluster
 
-def linkStructure(atomn, cutoff, rmsdSequence):
-    cluster = newCluster(atomn)
+def link_structure(atomn, cutoff, rmsdSequence):
+    cluster = new_cluster(atomn)
     sthChangeStatus = True
     while (sthChangeStatus is True):
         sthChangeStatus = False
@@ -24,7 +24,7 @@ def linkStructure(atomn, cutoff, rmsdSequence):
                 break
     return cluster
 
-def renumCluster(cluster):
+def renum_cluster(cluster):
     clustID = 1
     for i in range(1, len(cluster)):
         if (cluster[i].get("clust") != cluster[i - 1].get("clust")):
@@ -39,24 +39,3 @@ def renumCluster(cluster):
         clustList[item.get("clust") - 1].append(item.get("conf"))
 
     return cluster, clustList
-
-def oldSingleLinkage():
-    # Cluster
-	clusters = [[0 + self.trajstartn]]
-	for i in range(1, self.trajn):
-		newGroupFlag = True
-		for group in clusters:
-			# rmsdMatrix index equals to frame index minus start frame index, start from 0
-			if all([self.rmsdMatrix[i][g - self.trajstartn] < cutoff for g in group]):
-				group.append(i + self.trajstartn)
-				newGroupFlag = False
-				break
-		if newGroupFlag is True:
-			clusters.append([i + self.trajstartn])
-
-	titleLine = '{0:>6}'.format("Groupn") + " | " + '{0:>24}'.format("Group members (Framen)")
-	log = [titleLine]
-	groupn = 0
-	for group in clusters:
-		groupn += 1
-		log.append('{0:>6}'.format(groupn) + " | " + ', '.join([str(g) for g in group]))

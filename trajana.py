@@ -1,13 +1,14 @@
 import os, time, math
 import numpy as np
 
-from gmx.structure.molMatrix import molmatrix2pdb, pdb2molmatrix
-from gmx.structure.rmsdMatrix import checkRmsdMatrix, upperRmsdMatrix, reshapeRmsdMatrix
+from gmx.structure.mol_matrix import load_as_mol_matrix, write_mol_matrix
+from gmx.structure.matrix_shape import is_squared_matrix
+from gmx.structure.rmsd_matrix import upper_rmsd_matrix, reshape_rmsd_matrix
 
-from gmx.math.clust import newCluster, linkStructure, renumCluster
+from gmx.math.clust import link_structure, renum_cluster
 from gmx.math.common import cluster, fitplane, convertSeconds
 from gmx.math.hbond import hbondmolgrp
-from gmx.math.rmsd import rmsdMol
+from gmx.math.rmsd import rmsd_mol
 from gmx.math.image import array2image, writeImage
 
 from gmx.other.input_func import convert_input_type
@@ -187,7 +188,7 @@ class TrajAnalysis(object):
 
 		if rightFormat is True:
 			matrix = np.array(matrix)
-			if checkRmsdMatrix(matrix):
+			if is_squared_matrix(matrix):
 				self.rmsdMatrix = matrix
 				self.trajn = matrix.shape[0]
 				self.__rmsdMatrixCalc = True
@@ -250,7 +251,7 @@ class TrajAnalysis(object):
 		self.trajstartn = start
 		self.trajendn = end
 		# Load trajectory profile from the first frame(should end with number 0)
-		firstframe = pdb2molmatrix(framePath(start))
+		firstframe = load_as_mol_matrix(framePath(start))
 		# Remove coordinate and velocity terms
 		# Add atom id term for each atom, begin counting
 		# Atom ids would be count from 1
@@ -275,7 +276,7 @@ class TrajAnalysis(object):
 		ManageLoad = ProgressBar(self.trajn)
 		ManageLoad.start("[Info] Start reading files.")
 		for i in range(self.trajstartn, self.trajendn + 1):
-			mols = pdb2molmatrix(framePath(i))
+			mols = load_as_mol_matrix(framePath(i))
 			self.trajcoord.append(np.vstack([mol.get("coordinate") for mol in mols.values()]))
 			ManageLoad.forward(1)
 		ManageLoad.end("[Info] All File have loaded successfully.")
@@ -499,7 +500,7 @@ class TrajAnalysis(object):
 		for i in range(self.trajn):
 			framen += 1
 			thisMatrix = self.trajcoord[i]
-			rmsdv = rmsdMol(refMatrix, thisMatrix, weightFactor)
+			rmsdv = rmsd_mol(refMatrix, thisMatrix, weightFactor)
 			log.append('{0:>6}'.format(framen) + " | " + '{0:>8.3f}'.format(rmsdv))
 
 		self.writeLog("rmsd_mol", log)
@@ -525,14 +526,14 @@ class TrajAnalysis(object):
 		ManageRMSD.start("[Info] Start calculating RMSD matrix.")
 		for i in range(self.trajn - 1):
 			for j in range(i + 1, self.trajn):
-				self.rmsdMatrix[i][j] = rmsdMol(self.trajcoord[i], self.trajcoord[j], weightFactor)
+				self.rmsdMatrix[i][j] = rmsd_mol(self.trajcoord[i], self.trajcoord[j], weightFactor)
 				self.rmsdMatrix[j][i] = self.rmsdMatrix[i][j]
 			ManageRMSD.forward(1)
 		endTime = time.time()
 		ManageRMSD.end("[Info] RMSD matrix calculation normally ends.")
 		print("[Info] Total time usage = %s." % convertSeconds(endTime - startTime))
 
-		upperHalf = upperRmsdMatrix(self.rmsdMatrix)
+		upperHalf = upper_rmsd_matrix(self.rmsdMatrix)
 		print("[Info] Minimum RMSD Value = %8.3f." % np.min(upperHalf))
 		print("[Info] Maximum RMSD Value = %8.3f." % np.max(upperHalf))
 		print("[Info] Average RMSD Value = %8.3f." % np.average(upperHalf))
@@ -554,11 +555,11 @@ class TrajAnalysis(object):
 		if self.checkRmsdMatrixCalc() is False:
 			self.concRmsdMatrix()
 
-		cindex, clust = renumCluster(
-			linkStructure(
+		cindex, clust = renum_cluster(
+			link_structure(
 				self.trajn,
 				cutoff,
-				reshapeRmsdMatrix(self.rmsdMatrix)
+				reshape_rmsd_matrix(self.rmsdMatrix)
 			)
 		)
 
@@ -637,7 +638,7 @@ class TrajAnalysis(object):
 			mol = {"name":molprof.get("name"), "atom":molprof.get("atom")}
 			mol.update({"coordinate":np.vstack([framecoord[l-1] for l in molprof.get("atomid")])})
 			molmatrix.update({moln:mol})
-		molmatrix2pdb(molmatrix, os.path.join(self.getWorkPath(), "newframe%d.pdb" % frameid))
+		write_mol_matrix(molmatrix, os.path.join(self.getWorkPath(), "newframe%d.pdb" % frameid))
 
 	def writeGroups(self, pairs, filename):
 		# pairs should be a tuple list
@@ -654,6 +655,6 @@ class TrajAnalysis(object):
 					mol = {"name":molprof.get("name"), "atom":molprof.get("atom")}
 					mol.update({"coordinate":np.vstack([self.trajcoord[frameid][l-1] for l in molprof.get("atomid")])})
 					molmatrix.update({moln:mol})
-			molmatrix2pdb(molmatrix, os.path.join(self.getWorkPath(), "%s.pdb" % filename))
+			write_mol_matrix(molmatrix, os.path.join(self.getWorkPath(), "%s.pdb" % filename))
 		else:
 			raise ValueError("Wrong parameters. Function writeGroups expects two parameters, the former one to be a tuple list in which each element should be a pack of frame ID and molecular ID list and the latter one to be the wanted file name without suffix.")

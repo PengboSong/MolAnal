@@ -1,32 +1,31 @@
 import math
 import numpy as np
 
-from gmx.structure.coordMatrix import checkCoordinateMatrix
-from gmx.structure.coordMatrix import checkLineMatrix
+from gmx.structure.coord_matrix import is_coord_matrix, is_vector
 
-def rmsd(refMatrix, modMatrix, weightFactor):
+def rmsd(ref_mat, mol_mat, weight_factor):
     # lambda function calculate length of random dimensions vector
-    lengthSquared = np.array(list(map(lambda vector: sum([val**2 for val in vector]), modMatrix - refMatrix)))
-    rmsdValue = math.sqrt(np.average(lengthSquared * weightFactor))
-    return rmsdValue
+    length_squared = np.array(list(map(lambda vector: sum([val**2 for val in vector]), mol_mat - ref_mat)))
+    rmsd_value = math.sqrt(np.average(length_squared * weight_factor))
+    return rmsd_value
 
-def fitting(refMatrix, modMatrix, weightFactor):
+def fitting(ref_mat, mol_mat, weight_factor):
 
     # Calculate vectors from origin to centers of molecules
-    broadWeightFactor = np.array([weightFactor, weightFactor, weightFactor]).transpose()
-    refCenter = np.average(refMatrix * broadWeightFactor, axis = 0)
-    modCenter = np.average(modMatrix * broadWeightFactor, axis = 0)
+    broad_weight_factor = np.array([weight_factor, weight_factor, weight_factor]).transpose()
+    ref_center = np.average(ref_mat * broad_weight_factor, axis = 0)
+    mod_center = np.average(mol_mat * broad_weight_factor, axis = 0)
 
     # Translate two matrixes to align centers of the two molecules to the origin
-    transRefMatrix = refMatrix - refCenter
-    transModMatrix = modMatrix - modCenter
+    trans_ref_matrix = ref_mat - ref_center
+    trans_mod_matrix = mol_mat - mod_center
 
     # Rotate the latter matrix to fit with the least RMSD
 
     # Derive unitary rotation matrix
     ndim = 3
-    vectorX = transRefMatrix.transpose()
-    vectorY = transModMatrix.transpose()
+    vectorX = trans_ref_matrix.transpose()
+    vectorY = trans_mod_matrix.transpose()
     lenVector = vectorX.shape[1]
 
     rM = np.zeros((ndim, ndim))
@@ -34,7 +33,7 @@ def fitting(refMatrix, modMatrix, weightFactor):
     for i in range(ndim):
     	for j in range(ndim):
     		for k in range(lenVector):
-    			rM[i][j] += weightFactor[k] * vectorY[i][k] * vectorX[j][k]
+    			rM[i][j] += weight_factor[k] * vectorY[i][k] * vectorX[j][k]
 
     sPDM = np.dot(rM.transpose(), rM)
 
@@ -55,25 +54,25 @@ def fitting(refMatrix, modMatrix, weightFactor):
     		for k in range(ndim):
     			uM[i][j] += bM[k][i] * aM[k][j]
 
-    newMatrix = np.dot(uM.transpose(), vectorY).transpose() + refCenter
-    fittingRMSD = rmsd(refMatrix, newMatrix, weightFactor)
-    return newMatrix, fittingRMSD
+    new_matrix = np.dot(uM.transpose(), vectorY).transpose() + ref_center
+    fit_rmsd = rmsd(ref_mat, new_matrix, weight_factor)
+    return new_matrix, fit_rmsd
 
-def rmsdMol(molMatrixA, molMatrixB, weightFactor, fittingFlag = True):
+def rmsd_mol(molMatrixA, molMatrixB, weight_factor, fittingFlag = True):
     # Check parameters
-    status, errorInfo = checkCoordinateMatrix(molMatrixA)
+    status, errorInfo = is_coord_matrix(molMatrixA)
     if not status:
         raise ValueError(errorInfo)
-    status, errorInfo = checkCoordinateMatrix(molMatrixB)
+    status, errorInfo = is_coord_matrix(molMatrixB)
     if not status:
         raise ValueError(errorInfo)
-    status, errorInfo = checkLineMatrix(weightFactor)
+    status, errorInfo = is_vector(weight_factor)
     if not status:
         raise ValueError(errorInfo)
-    if not (molMatrixA.shape[0] == molMatrixB.shape[0] == len(weightFactor)):
+    if not (molMatrixA.shape[0] == molMatrixB.shape[0] == len(weight_factor)):
         raise ValueError("Lengths of reference matrix, modified matrix and weight factor vector are not equal.")
     if fittingFlag is True:
-        molNewMatrixB, rmsdValue = fitting(molMatrixA, molMatrixB, weightFactor)
+        molNewMatrixB, rmsd_value = fitting(molMatrixA, molMatrixB, weight_factor)
     else:
-        rmsdValue = rmsd(molMatrixA, molMatrixB, weightFactor)
-    return rmsdValue
+        rmsd_value = rmsd(molMatrixA, molMatrixB, weight_factor)
+    return rmsd_value

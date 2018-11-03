@@ -1,18 +1,17 @@
 import os, math, random
 import numpy as np
 
-from gmx.inputFunctions import convert_input_type
-from gmx.structure.molMatrix import molmatrix2pdb, pdb2molmatrix
+from gmx.other.input_func import convert_input_type
+from gmx.structure.mol_matrix import write_mol_matrix
 
 from gmx.math.common import fitplane, rotate
 
 from custom.general import listFiles
 
 class Moledit(object):
-	def __init__(self, pdbfile):
-		self.mols = pdb2molmatrix(pdbfile)
-		self.parentdir = os.path.split(pdbfile)[0]
-		self.pdbname = os.path.split(pdbfile)[1]
+	def __init__(self, frame):
+		self.mols = load_as_mol_matrix(frame)
+		self.parent_dir, self.frame_name = os.path.split(frame)
 		self.command()
 
 	def command(self):
@@ -126,12 +125,9 @@ class Moledit(object):
 
 	def write(self, copy = False):
 		if copy is True:
-			pdbname = input("Please enter the name to save as:")
+			frame_name = input("Please enter the name to save as:")
 		else:
-			pdbname = self.pdbname
-		try:
-			molmatrix2pdb(self.mols, os.path.join(self.parentdir, pdbname))
-		except Exception as e:
-			print("[Error] "+str(e)+".")
-		else:
-			print("[Info] File %s has been written successfully." % pdbname)
+			frame_name = self.frame_name
+
+		write_mol_matrix(self.mols, os.path.join(self.parent_dir, frame_name))
+		print("[Info] File %s has been written successfully." % frame_name)
