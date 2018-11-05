@@ -14,8 +14,9 @@ def hbondgrp(moltypeA, moltypeB, start, end, lpdir = False, load_path = "frames"
 	traj_prof = {}
 	log = []
 
-	frames_dir = os.path.join(save_path, "mols_%s-%s" %(moltypeA.lower(), moltypeB.lower())) + time.strftime("%Y%m%d_%H%M%S")
-	os.mkdir(frames_dir)
+	frames_dir = os.path.join(save_path, "mols_%s-%s" %(moltypeA.lower(), moltypeB.lower()))
+	if not os.path.isdir(frames_dir):
+		os.mkdir(frames_dir)
 
 	# Title
 	title = '{0:>14}'.format("donor") + " | " + '{0:>14}'.format("hydro") + " | " + '{0:>14}'.format("acceptor") + " | " + '{0:>9}'.format("distance") + " | " + '{0:>6}'.format("angle")
@@ -75,7 +76,9 @@ def hbondgrp(moltypeA, moltypeB, start, end, lpdir = False, load_path = "frames"
 			mol = {"name":mol_prof.get("name"), "atom":mol_prof.get("atom")}
 			mol.update({"coordinate":np.vstack([frame_coord[l-1] for l in mol_prof.get("atomid")])})
 			mol_matrix.update({moln: mol})
-		write_mol_matrix(mol_matrix, os.path.join(save_path, frames_dir, "newframe%d.pdb" % i))
+		write_mol_matrix(mol_matrix, os.path.join(save_path, frames_dir,
+			"%s+%s-frame%d.pdb" % (moltypeA.lower(), moltypeB.lower(), i)
+		))
 
 		framen += 1
 		manage_load.forward(1)
@@ -93,7 +96,7 @@ def hbondgrp(moltypeA, moltypeB, start, end, lpdir = False, load_path = "frames"
 	hbondnlog = ['{0:>6}'.format("frames") + " | " + '{0:>6}'.format("hbondn")]
 	for i in range(self.trajstartn, self.trajendn + 1):
 		hbondnlog.append('{0:>6}'.format(i) + " | " + '{0:>6}'.format(frame_hbondns.get(i)))
-	with open(os.path.join(self._savePath,
+	with open(os.path.join(save_path,
 		"hbondsum_%s+%s-%s.txt" % (moltypeA.lower(), moltypeB.lower(), time.strftime("%Y%m%d_%H%M"))
 		), "w") as f:
 		f.writelines(line + '\n' for line in hbondnlog)
