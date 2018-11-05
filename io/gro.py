@@ -94,8 +94,36 @@ def gro2atom_matrix(gro_path, maxsize = 209715200):
 					}
 					atoms.update({line_data.get("atom_id"):atom_matrix})
 	else:
-		raise IOError("Can not load file %s. Expect a .gro file." % gro_path)
+		raise IOError("Can not load file %s." % gro_path)
 	return atoms
+
+def gro2coord_matrix(gro_path, maxsize = 209715200):
+	# Initialize coordinate matrix
+	coords = []
+	# Load gro file
+	if os.path.isfile(gro_path) and os.path.splitext(gro_path)[1] == ".gro":
+		with open(gro_path, 'r') as f:
+			rown = 0
+			# Skip title
+			rown += 1
+			f.readline()
+			# Second line should be an integer equals to total atom numbers
+			rown += 1
+			atomn = f.readline().strip()
+			if is_int(atomn):
+				atomn = int(atomn)
+			else:
+				raise ValueError("Incorrect gromacs file format. Please check file %s." % gro_path)
+
+			for line in f.readlines(maxsize):
+				rown += 1
+				# Line 'atomn + 3' should be solvate box parameters
+				if rown < atomn + 3:
+					coords.append(readline_gro(line, rown).get("coordinate"))
+	else:
+		raise IOError("Can not load file %s." % gro_path)
+	coords = np.vstack(coords)
+	return coords
 
 def gro2mol_matrix(gro_path, maxsize = 209715200):
 	# Initialize molecular matrix dict
@@ -145,7 +173,7 @@ def gro2mol_matrix(gro_path, maxsize = 209715200):
 			mol_matrix.update({"atom":atom, "coordinate":np.array(coordinate), "velocity":np.array(velocity)})
 			mols.update({mol_id:mol_matrix})
 	else:
-		raise IOError("Can not load file %s. Expect a .gro file." % gro_path)
+		raise IOError("Can not load file %s." % gro_path)
 	return mols
 
 def atom_matrix2gro(atoms, file_name = "frame", write_velocity = False):

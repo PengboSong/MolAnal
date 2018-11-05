@@ -1,16 +1,13 @@
-import os.path, imp, time
+import os.path, time
 import numpy as np
-
-with_opencv_flag = False
 
 def check_opencv_module():
 	try:
-		imp.find_module('cv2')
-	except ImportError:
-		with_opencv_flag = False
-	else:
 		import cv2
-		with_opencv_flag = True
+	except ImportError:
+		return False
+	else:
+		return True
 
 def sequence2image(sequence, imageXY, colorMap = True):
 	if (isinstance(imageXY, tuple) and len(imageXY) == 2 and isinstance(imageXY[0], int) and isinstance(imageXY[1], int)) and (isinstance(sequence, np.ndarray) and sequence.ndim == 1 and sequence.size == imageXY[0] * imageXY[1]):
@@ -20,8 +17,7 @@ def sequence2image(sequence, imageXY, colorMap = True):
 		raise ValueError("Incompatible size of sequence and target image.")
 
 def array2image(array, imageXY, colorMap = True):
-	check_opencv_module()
-	if (with_opencv_flag is True):
+	if (check_opencv_module() is True):
 		if (isinstance(imageXY, tuple) and len(imageXY) == 2 and isinstance(imageXY[0], int) and isinstance(imageXY[1], int)) and (isinstance(array, np.ndarray) and array.ndim == 2 and array.shape == imageXY):
 			imgGrey = cv2.normalize(src=array, dst=None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8UC1)
 			if (colorMap is True):
@@ -35,8 +31,7 @@ def array2image(array, imageXY, colorMap = True):
 		raise ImportError("Can not find cv2 module. Please install it first with command \'pip3 install opencv-python\'.")
 
 def writeImage(image, name, dir = "."):
-	check_opencv_module()
-	if (with_opencv_flag is True):
+	if (check_opencv_module() is True):
 		# yyyymmdd-HHMMSS
 		timeFormat = time.strftime("%Y%m%d_%H%M%S")
 		fileName = name + "_" + timeFormat + ".png"

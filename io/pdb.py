@@ -114,8 +114,24 @@ def pdb2atom_matrix(pdb_path, maxsize = 209715200):
 					}
 					atoms.update({line_data.get("atom_serial_number"):atom_matrix})
 	else:
-		raise IOError("Can not load file %s. Expect a .pdb file." % pdb_path)
+		raise IOError("Can not load file %s." % pdb_path)
 	return atoms
+
+def pdb2coord_matrix(pdb_path, maxsize = 209715200):
+	# Initialize coordinate matrix
+	coords = []
+	# Load pdb file
+	if os.path.isfile(pdb_path) and os.path.splitext(pdb_path)[1] == ".pdb":
+		with open(pdb_path, 'r') as f:
+			rown = 0
+			for line in f.readlines(maxsize):
+				rown += 1
+				if line[0:6] in ("ATOM  ", "HETATM"):
+					coords.append(readline_pdb(line, rown).get("coordinate"))
+	else:
+		raise IOError("Can not load file %s." % pdb_path)
+	coords = np.vstack(coords)
+	return coords
 
 def pdb2mol_matrix(pdb_path, maxsize = 209715200):
 	# Initialize molecular matrix dict
@@ -153,7 +169,7 @@ def pdb2mol_matrix(pdb_path, maxsize = 209715200):
 			mol_matrix.update({"atom":atom, "coordinate":np.array(coordinate), "velocity":np.array(velocity)})
 			mols.update({mol_id:mol_matrix})
 	else:
-		raise IOError("Can not load file %s. Expect a .pdb file." % pdb_path)
+		raise IOError("Can not load file %s." % pdb_path)
 	return mols
 
 def pdb2gro(pdb_path, csv_path, gro_path, maxsize = 209715200):
@@ -171,7 +187,7 @@ def pdb2gro(pdb_path, csv_path, gro_path, maxsize = 209715200):
 					line_data = readline_pdb(line, row)
 					data.update({line_data.get("atom_serial_number"):line_data})
 	else:
-		raise IOError("Can not load file %s. Expect a .pdb file." % pdb_path)
+		raise IOError("Can not load file %s." % pdb_path)
 
 	# Load csv file recording completion lines
 	if os.path.isfile(csv_path) and os.path.splitext(csv_path)[1] == ".csv":
