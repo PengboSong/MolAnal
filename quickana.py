@@ -94,7 +94,7 @@ def hbondgrp(moltypeA, moltypeB, start, end, lpdir = False, load_path = "frames"
 			f.writelines(line + '\n' for line in log)
 
 	hbondnlog = ['{0:>6}'.format("frames") + " | " + '{0:>6}'.format("hbondn")]
-	for i in range(self.trajstartn, self.trajendn + 1):
+	for i in range(start, end + 1):
 		hbondnlog.append('{0:>6}'.format(i) + " | " + '{0:>6}'.format(frame_hbondns.get(i)))
 	with open(os.path.join(save_path,
 		"hbondsum_%s+%s-%s.txt" % (moltypeA.lower(), moltypeB.lower(), time.strftime("%Y%m%d_%H%M"))
