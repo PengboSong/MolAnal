@@ -24,41 +24,41 @@ class TrajAnalysis(object):
 		self.trajn = 0
 		self.atomn = 0
 		self.moln = 0
-		self.rmsdMatrix = np.array([])
-		self.weightFactor = np.array([])
+		self.rmsd_mat = np.array([])
+		self.weight = np.array([])
 
-		self._savePath = "."
-		self._loadPath = "."
-		self._workPath = "."
+		self._save_path = "."
+		self._load_path = "."
+		self._work_path = "."
 
-		self.__rmsdMatrixCalc = False
-		self.__outWeightFactor = False
+		self.__calc_rmsd_mat_flag = False
+		self.__set_weight_flag = False
 
-	def getSavePath(self):
-		return self._savePath
-	def setSavePath(self, path):
+	def get_save_path(self):
+		return self._save_path
+	def set_save_path(self, path):
 		if os.path.isdir(path):
-			self._savePath = path
+			self._save_path = path
 		else:
 			print("[Error] Invalid path. The given path should be a existing directory.")
 
-	def getLoadPath(self):
-		return self._loadPath
-	def setLoadPath(self, path):
+	def get_load_path(self):
+		return self._load_path
+	def set_load_path(self, path):
 		if os.path.isdir(path):
-			self._loadPath = path
+			self._load_path = path
 		else:
 			print("[Error] Invalid path. The given path should be a existing directory.")
 
-	def getWorkPath(self):
-		return self._workPath
-	def setWorkPath(self, path):
+	def get_work_path(self):
+		return self._work_path
+	def set_work_path(self, path):
 		if os.path.isdir(path):
-			self._workPath = path
+			self._work_path = path
 		else:
 			print("[Error] Invalid path. The given path should be a existing directory.")
 
-	def clearAll(self):
+	def clear_all(self):
 		self.trajprof = {}
 		self.trajcoord = []
 		self.trajn = 0
@@ -66,18 +66,18 @@ class TrajAnalysis(object):
 		self.trajendn = 0
 		self.atomn = 0
 		self.moln = 0
-		self.rmsdMatrix = np.array([])
-		self.weightFactor = np.array([])
+		self.rmsd_mat = np.array([])
+		self.weight = np.array([])
 
 		# Reset Flags
-		self.__rmsdMatrixCalc = False
-		self.__outWeightFactor = False
+		self.__calc_rmsd_mat_flag = False
+		self.__set_weight_flag = False
 
-	def useOutWeightFactor(self):
-		return self.__outWeightFactor
+	def set_weight_status(self):
+		return self.__set_weight_flag
 
-	def checkRmsdMatrixCalc(self):
-		return self.__rmsdMatrixCalc
+	def calc_rmsd_mat_status(self):
+		return self.__calc_rmsd_mat_flag
 
 	def checkAtomID(self, atomID):
 		if isinstance(atomID, int) and atomID <= self.atomn:
@@ -112,51 +112,51 @@ class TrajAnalysis(object):
 		else:
 			return False
 
-	def loadWeightFactor(self):
-		rightFactor = False
-		file = listFiles(None, (".txt", ".csv", ".log"), self.getWorkPath())
+	def load_weight_factor(self):
+		right_weight_flag = False
+		file = listFiles(None, (".txt", ".csv", ".log"), self.get_work_path())
 		with open(file, "r") as f:
 			factorLine = f.readline().strip().split()
 			if len(factors) != self.atomn:
-				rightFactor = False
+				right_weight_flag = False
 			else:
-				rightFactor = True
+				right_weight_flag = True
 				for i in factorLine:
 					try:
 						float(i)
 					except Exception as e:
-						rightFactor = False
+						right_weight_flag = False
 						break
 
-		if rightFactor is True:
+		if right_weight_flag is True:
 			factors = [float(i) for i in factorLine]
-			self.weightFactor = np.array(factors)
-			self.__outWeightFactor = True
+			self.weight = np.array(factors)
+			self.__set_weight_flag = True
 		else:
-			self.__outWeightFactor = False
+			self.__set_weight_flag = False
 
-	def setWeightFactor(self):
-		rightFactor = False
-		while (rightFactor is False):
+	def set_weight_factor(self):
+		right_weight_flag = False
+		while (right_weight_flag is False):
 			factorLine = input("Enter weighting factors for this trajectory: ")
 			factors = factorLine.strip().split()
 			if len(factors) != self.atomn:
-				rightFactor = False
+				right_weight_flag = False
 			else:
-				rightFactor = True
+				right_weight_flag = True
 				for i in factors:
 					try:
 						float(i)
 					except Exception as e:
-						rightFactor = False
+						right_weight_flag = False
 						break
 		factors = [float(i) for i in factors]
-		self.weightFactor = np.array(factors)
+		self.weight = np.array(factors)
 
-		self.__outWeightFactor = True
+		self.__set_weight_flag = True
 
-	def loadRmsdMatrix(self):
-		matrixFile = listFiles(None, ".csv", self.getWorkPath())
+	def load_rmsd_matrix(self):
+		matrixFile = listFiles(None, ".csv", self.get_work_path())
 
 		matrix = []
 		with open(matrixFile) as f:
@@ -190,11 +190,11 @@ class TrajAnalysis(object):
 		if rightFormat is True:
 			matrix = np.array(matrix)
 			if is_squared_matrix(matrix):
-				self.rmsdMatrix = matrix
+				self.rmsd_mat = matrix
 				self.trajn = matrix.shape[0]
-				self.__rmsdMatrixCalc = True
+				self.__calc_rmsd_mat_flag = True
 
-				upperHalf = upperRmsdMatrix(self.rmsdMatrix)
+				upperHalf = upperRmsdMatrix(self.rmsd_mat)
 				print("[Info] Minimum RMSD Value = %8.3f." % np.min(upperHalf))
 				print("[Info] Maximum RMSD Value = %8.3f." % np.max(upperHalf))
 				print("[Info] Average RMSD Value = %8.3f." % np.average(upperHalf))
@@ -203,7 +203,7 @@ class TrajAnalysis(object):
 		else:
 			print("[Error] Incompatible matrix file format.")
 
-	def listCommand(self):
+	def list_command(self):
 		cmdList = [x for x in dir(self) if not x.startswith("_") and callable(getattr(self, x))]
 		cmdList.sort()
 		for i in range(len(cmdList)):
@@ -245,7 +245,7 @@ class TrajAnalysis(object):
 		self.trajstartn = start
 		self.trajendn = end
 		# Load trajectory profile from the first frame
-		first_frame = load_mol_matrix(os.path.join(self._loadPath, "%s%d.%s" % (prefix, start, suffix)))
+		first_frame = load_mol_matrix(os.path.join(self.get_load_path(), "%s%d.%s" % (prefix, start, suffix)))
 		# Remove coordinate and velocity terms
 		# Add atom id term for each atom, begin counting
 		# Atom ids would be count from 1
@@ -273,20 +273,20 @@ class TrajAnalysis(object):
 		ManageLoad.start("[Info] Start reading files.")
 		for i in range(self.trajstartn, self.trajendn + 1):
 			self.trajcoord.append(
-				load_coord_matrix(os.path.join(self._loadPath, "%s%d.%s" % (prefix, i, suffix)))
+				load_coord_matrix(os.path.join(self.get_load_path(), "%s%d.%s" % (prefix, i, suffix)))
 			)
 			ManageLoad.forward(1)
 		ManageLoad.end("[Info] All File have loaded successfully.")
 
-		self.rmsdMatrix = np.zeros((self.trajn, self.trajn))
-		self.weightFactor = np.zeros((self.trajn,))
+		self.rmsd_mat = np.zeros((self.trajn, self.trajn))
+		self.weight = np.zeros((self.trajn,))
 
-	def molCenter(self, frameID, molID):
+	def mol_center(self, frameID, molID):
 		atomIDList = self.trajprof.get(molID).get("atomid")
 		framecoord = self.trajprof[frameID - self.trajstartn]
 		center = np.average(framecoord[min(atomIDList) - 1 : max(atomIDList)], axis=0)
 		return center
-	def molCenterWithCoord(self, framecoord, molID):
+	def mol_center_with_coord(self, framecoord, molID):
 		atomIDList = self.trajprof.get(molID).get("atomid")
 		center = np.average(framecoord[min(atomIDList) - 1 : max(atomIDList)], axis=0)
 		return center
@@ -316,7 +316,7 @@ class TrajAnalysis(object):
 				dists.append(findist)
 			log.append('{0:>6}'.format(framen) + " | " + " | ".join(['{0:>11.3f}'.format(d) for d in dists]))
 
-		with open(os.path.join(self._savePath, "distance-%s.txt" % time.strftime("%Y%m%d_%H%M")), "w") as f:
+		with open(os.path.join(self.get_save_path(), "distance-%s.txt" % time.strftime("%Y%m%d_%H%M")), "w") as f:
 			f.writelines(line + '\n' for line in log)
 
 	def distance_mol(self, molid, atomid):
@@ -333,7 +333,7 @@ class TrajAnalysis(object):
 		framen = self.trajstartn - 1
 		for framecoord in self.trajcoord:
 			framen += 1
-			center = self.molCenterWithCoord(framecoord, molid)
+			center = self.mol_center_with_coord(framecoord, molid)
 			dists = []
 			for a in atomid:
 				pair0 = center - framecoord[a - 1]
@@ -341,7 +341,7 @@ class TrajAnalysis(object):
 				dists.append(findist)
 			log.append('{0:>6}'.format(framen) + " | " + " | ".join(['{0:>11.3f}'.format(d) for d in dists]))
 
-		with open(os.path.join(self._savePath, "distance_mol-%s.txt" % time.strftime("%Y%m%d_%H%M")), "w") as f:
+		with open(os.path.join(self.get_save_path(), "distance_mol-%s.txt" % time.strftime("%Y%m%d_%H%M")), "w") as f:
 			f.writelines(line + '\n' for line in log)
 
 	def location(self, atomid):
@@ -367,7 +367,7 @@ class TrajAnalysis(object):
 			log.append('{0:>8}'.format(framen) + " | " + " | ".join(['{0:>6.3f}'.format(c) for c in locations]))
 		log.append('{0:>8}'.format("Average") + " | " + " | ".join(['{0:>6.3f}'.format(c / (framen + 1)) for c in sum]))
 
-		with open(os.path.join(self._savePath, "location-%s.txt" % time.strftime("%Y%m%d_%H%M")), "w") as f:
+		with open(os.path.join(self.get_save_path(), "location-%s.txt" % time.strftime("%Y%m%d_%H%M")), "w") as f:
 			f.writelines(line + '\n' for line in log)
 
 	def location_mol(self, molid):
@@ -387,13 +387,13 @@ class TrajAnalysis(object):
 			framen += 1
 			centers = []
 			for m in molid:
-				centers.extend(self.molCenterWithCoord(framecoord, m))
+				centers.extend(self.mol_center_with_coord(framecoord, m))
 			centers = np.array(centers)
 			sum += centers
 			log.append('{0:>8}'.format(framen) + " | " + " | ".join(['{0:>6.3f}'.format(c) for c in centers]))
 		log.append('{0:>8}'.format("Average") + " | " + " | ".join(['{0:>6.3f}'.format(c / (framen + 1)) for c in sum]))
 
-		with open(os.path.join(self._savePath, "location_mol-%s.txt" % time.strftime("%Y%m%d_%H%M")), "w") as f:
+		with open(os.path.join(self.get_save_path(), "location_mol-%s.txt" % time.strftime("%Y%m%d_%H%M")), "w") as f:
 			f.writelines(line + '\n' for line in log)
 
 	def dist2plane(self, atomid, plane):
@@ -419,7 +419,7 @@ class TrajAnalysis(object):
 			pldist = abs(plnormal.dot(coord) + plps[3])/math.sqrt(plnormal.dot(plnormal))
 			log.append('{0:>6}'.format(framen) + " | " + '{0:>8.3f}'.format(pldist))
 
-		with open(os.path.join(self._savePath, "dist2plane-%s.txt" % time.strftime("%Y%m%d_%H%M")), "w") as f:
+		with open(os.path.join(self.get_save_path(), "dist2plane-%s.txt" % time.strftime("%Y%m%d_%H%M")), "w") as f:
 			f.writelines(line + '\n' for line in log)
 
 	def dist2plane_mol(self, molid, plane):
@@ -437,7 +437,7 @@ class TrajAnalysis(object):
 		framen = self.trajstartn - 1
 		for framecoord in self.trajcoord:
 			framen += 1
-			center = self.molCenterWithCoord(framecoord, molid)
+			center = self.mol_center_with_coord(framecoord, molid)
 			# Function fitplane only accepts a package of at least three points' coordinate (better near a plane) in the form of either tuple or list, each element of the package should be a 1-dim 3-size numpy.ndarray object
 			plps = fitplane([framecoord[x - 1] for x in plane])	# Short of plane parameters
 			# Attention: plps should be a tuple with 4 elements, denoted as a, b, c, d. The plane equation should be ax+by+cz=0
@@ -445,10 +445,10 @@ class TrajAnalysis(object):
 			pldist = abs(plnormal.dot(center) + plps[3])/math.sqrt(plnormal.dot(plnormal))
 			log.append('{0:>6}'.format(framen) + " | " + '{0:>8.3f}'.format(pldist))
 
-		with open(os.path.join(self._savePath, "dist2plane_mol-%s.txt" % time.strftime("%Y%m%d_%H%M")), "w") as f:
+		with open(os.path.join(self.get_save_path(), "dist2plane_mol-%s.txt" % time.strftime("%Y%m%d_%H%M")), "w") as f:
 			f.writelines(line + '\n' for line in log)
 
-	def dist2plane_mol_sign(self, molid, plane, reference_coord = (0., 0., 0.)):
+	def dist2plane_mol_signed(self, molid, plane, reference_coord = (0., 0., 0.)):
 		# Check
 		if not self.checkMolID(molid) or not self.checkAtomIDList(plane):
 			raise ValueError("Wrong parameters. Function dist2planeMol expects the first parameter to be the selected molecular ID, the second one to be an ID list (or tuple) for atom(s) in the reference plane and the last one to be the selected atom ID that should be in the positive site.")
@@ -462,7 +462,7 @@ class TrajAnalysis(object):
 		framen = self.trajstartn - 1
 		for framecoord in self.trajcoord:
 			framen += 1
-			center = self.molCenterWithCoord(framecoord, molid)
+			center = self.mol_center_with_coord(framecoord, molid)
 			# Function fitplane only accepts a package of at least three points' coordinate (better near a plane) in the form of either tuple or list, each element of the package should be a 1-dim 3-size numpy.ndarray object
 			plps = fitplane([framecoord[x - 1] for x in plane])	# Short of plane parameters
 			# Attention: plps should be a tuple with 4 elements, denoted as a, b, c, d. The plane equation should be ax+by+cz=0
@@ -475,7 +475,7 @@ class TrajAnalysis(object):
 				pldist = - pldist
 			log.append('{0:>6}'.format(framen) + " | " + '{0:>8.3f}'.format(pldist))
 
-		with open(os.path.join(self._savePath, "dist2plane_mol_sign-%s.txt" % time.strftime("%Y%m%d_%H%M")), "w") as f:
+		with open(os.path.join(self.get_save_path(), "dist2plane_mol_sign-%s.txt" % time.strftime("%Y%m%d_%H%M")), "w") as f:
 			f.writelines(line + '\n' for line in log)
 
 	def rmsd(self, framen):
@@ -488,32 +488,32 @@ class TrajAnalysis(object):
 		log = [titleLine]
 		# Reference frame
 		refMatrix = self.trajcoord[framen - self.trajstartn]
-		weightFactor = np.ones(self.atomn)
+		weight_factor = np.ones(self.atomn)
 		# Start Counting
 		framen = self.trajstartn
 		for i in range(self.trajn):
 			framen += 1
 			thisMatrix = self.trajcoord[i]
-			rmsdv = rmsd_mol(refMatrix, thisMatrix, weightFactor)
+			rmsdv = rmsd_mol(refMatrix, thisMatrix, weight_factor)
 			log.append('{0:>6}'.format(framen) + " | " + '{0:>8.3f}'.format(rmsdv))
 
-		with open(os.path.join(self._savePath, "rmsd_mol-%s.txt" % time.strftime("%Y%m%d_%H%M")), "w") as f:
+		with open(os.path.join(self.get_save_path(), "rmsd_mol-%s.txt" % time.strftime("%Y%m%d_%H%M")), "w") as f:
 			f.writelines(line + '\n' for line in log)
 
 	def conc_rmsd_matrix(self):
 		# Check shape of RMSD matrix
-		if self.rmsdMatrix.ndim == 2 and self.rmsdMatrix.shape[0] == self.trajn and self.rmsdMatrix.shape[1] == self.trajn:
+		if self.rmsd_mat.ndim == 2 and self.rmsd_mat.shape[0] == self.trajn and self.rmsd_mat.shape[1] == self.trajn:
 			pass
 		else:
-			self.rmsdMatrix = np.zeros((self.trajn, self.trajn))
+			self.rmsd_mat = np.zeros((self.trajn, self.trajn))
 
 		# Construct RMSD Matrix
 
 		# change weight factor
-		if (self.useOutWeightFactor() is True):
-			weightFactor = self.weightFactor
+		if (self.set_weight_status() is True):
+			weight_factor = self.weight
 		else:
-			weightFactor = np.ones(self.atomn)
+			weight_factor = np.ones(self.atomn)
 
 		# Start Calculation
 		startTime = time.time()
@@ -521,39 +521,39 @@ class TrajAnalysis(object):
 		ManageRMSD.start("[Info] Start calculating RMSD matrix.")
 		for i in range(self.trajn - 1):
 			for j in range(i + 1, self.trajn):
-				self.rmsdMatrix[i][j] = rmsd_mol(self.trajcoord[i], self.trajcoord[j], weightFactor)
-				self.rmsdMatrix[j][i] = self.rmsdMatrix[i][j]
+				self.rmsd_mat[i][j] = rmsd_mol(self.trajcoord[i], self.trajcoord[j], weight_factor)
+				self.rmsd_mat[j][i] = self.rmsd_mat[i][j]
 			ManageRMSD.forward(1)
 		endTime = time.time()
 		ManageRMSD.end("[Info] RMSD matrix calculation normally ends.")
 		print("[Info] Total time usage = %s." % convertSeconds(endTime - startTime))
 
-		upperHalf = upper_rmsd_matrix(self.rmsdMatrix)
+		upperHalf = upper_rmsd_matrix(self.rmsd_mat)
 		print("[Info] Minimum RMSD Value = %8.3f." % np.min(upperHalf))
 		print("[Info] Maximum RMSD Value = %8.3f." % np.max(upperHalf))
 		print("[Info] Average RMSD Value = %8.3f." % np.average(upperHalf))
 
-		with open(os.path.join(self._savePath, "rmsd_matrix-%s.csv" % time.strftime("%Y%m%d_%H%M")), "w") as f:
-			f.writelines(";".join(['{0:>6.3f}'.format(i) for i in r]) + '\n' for r in self.rmsdMatrix)
+		with open(os.path.join(self.get_save_path(), "rmsd_matrix-%s.csv" % time.strftime("%Y%m%d_%H%M")), "w") as f:
+			f.writelines(";".join(['{0:>6.3f}'.format(i) for i in r]) + '\n' for r in self.rmsd_mat)
 
-		self.__rmsdMatrixCalc = True
+		self.__calc_rmsd_mat_flag = True
 
 		# RMSD matrix image
 		writeImage(
-			array2image(self.rmsdMatrix, (self.trajn, self.trajn), colorMap = True),
-			"rmsdMatrix",
-			self.getSavePath()
+			array2image(self.rmsd_mat, (self.trajn, self.trajn), colorMap = True),
+			"rmsd_matrix",
+			self.get_save_path()
 		)
 
 	def cluster_single_linkage(self, cutoff):
-		if self.checkRmsdMatrixCalc() is False:
+		if self.calc_rmsd_mat_status() is False:
 			self.concRmsdMatrix()
 
 		cindex, clust = renum_cluster(
 			link_structure(
 				self.trajn,
 				cutoff,
-				reshape_rmsd_matrix(self.rmsdMatrix)
+				reshape_rmsd_matrix(self.rmsd_mat)
 			)
 		)
 
@@ -565,7 +565,7 @@ class TrajAnalysis(object):
 			groupn += 1
 			log.append('{0:>6}'.format(groupn) + " | " + ', '.join([str(g) for g in group]))
 
-		with open(os.path.join(self._savePath, "cluster_single_linkage-%s.txt" % time.strftime("%Y%m%d_%H%M")), "w") as f:
+		with open(os.path.join(self.get_save_path(), "cluster_single_linkage-%s.txt" % time.strftime("%Y%m%d_%H%M")), "w") as f:
 			f.writelines(line + '\n' for line in log)
 
 	def hbondgrp(self, moltypeA, moltypeB, lpdir = False):
@@ -602,7 +602,7 @@ class TrajAnalysis(object):
 		print("[Info] Total time usage = %s." % convertSeconds(endTime - startTime))
 
 		if log:
-			with open(os.path.join(self._savePath,
+			with open(os.path.join(self.get_save_path(),
 			"hbond_%s+%s-%s.txt" % (moltypeA.lower(), moltypeB.lower(), time.strftime("%Y%m%d_%H%M"))
 			), "w") as f:
 				f.writelines(line + '\n' for line in log)
@@ -610,26 +610,27 @@ class TrajAnalysis(object):
 		hbondnlog = ['{0:>6}'.format("frames") + " | " + '{0:>6}'.format("hbondn")]
 		for i in range(self.trajstartn, self.trajendn + 1):
 			hbondnlog.append('{0:>6}'.format(i) + " | " + '{0:>6}'.format(frame_hbondns.get(i)))
-		with open(os.path.join(self._savePath,
+		with open(os.path.join(self.get_save_path(),
 			"hbondsum_%s+%s-%s.txt" % (moltypeA.lower(), moltypeB.lower(), time.strftime("%Y%m%d_%H%M"))
 			), "w") as f:
 			f.writelines(line + '\n' for line in hbondnlog)
 
-		timeFormat = time.strftime("%Y%m%d_%H%M%S")
-		newFrameDir = os.path.join(self.getWorkPath(), "mols_%s-%s" %(moltypeA.lower(), moltypeB.lower())) + timeFormat
-		if os.mkdir(newFrameDir):
-			org_work_path = self.getWorkPath()
-			self.setWorkPath(newFrameDir)
-			for j in frame_hbondmols.keys():
-				self.writeNewFrame(j, frame_hbondmols.get(j))
-			self.setWorkPath(org_work_path)
+		new_frame_dir = os.path.join(self.get_save_path(), "mols_%s-%s" %(moltypeA.lower(), moltypeB.lower())) + time.strftime("%Y%m%d")
+		if not os.path.isdir(new_frame_dir):
+			os.mkdir(newFrameDir)
+
+		org_save_path = self.get_save_path()
+		self.set_save_path(new_frame_dir)
+		for j in frame_hbondmols.keys():
+			self.write_new_frame(j, frame_hbondmols.get(j))
+		self.set_save_path(org_save_path)
 
 	# Extract some molecules out of one frame
-	def writeNewFrame(self, frameid, molid):
+	def write_new_frame(self, frameid, molid, conect = False):
 		molid = list(set(molid))
 		molid.sort()
 		if not self.checkFrameID(frameid) or not self.checkMolIDList(molid):
-			raise ValueError("Wrong parameters. Function writeNewFrame expects two parameters, the former one to be the selected frame ID and the latter one to be an ID list (or tuple) for the wanted molecule(s).")
+			raise ValueError("Wrong parameters. Function write_new_frame expects two parameters, the former one to be the selected frame ID and the latter one to be an ID list (or tuple) for the wanted molecule(s).")
 		molmatrix = {}
 		framecoord = self.trajcoord[frameid]
 		moln = 0
@@ -640,9 +641,9 @@ class TrajAnalysis(object):
 			mol = {"name":mol_prof.get("name"), "atom":mol_prof.get("atom")}
 			mol.update({"coordinate":np.vstack([framecoord[l-1] for l in mol_prof.get("atomid")])})
 			molmatrix.update({moln:mol})
-		write_mol_matrix(molmatrix, os.path.join(self.getWorkPath(), "newframe%d.pdb" % frameid))
+		write_mol_matrix(molmatrix, os.path.join(self.get_save_path(), "newframe%d.pdb" % frameid), conect)
 
-	def writeGroups(self, pairs, filename):
+	def write_groups(self, pairs, filename, conect = False):
 		# pairs should be a tuple list
 		# each tuple has two elements, the former one should be frame ID, and the latter one should be molecular ID
 		if (isinstance(pairs, list) and all([isinstance(p, tuple) and len(p) == 2 and self.checkFrameID(p[0]) and self.checkMolIDList(p[1]) for p in pairs])):
@@ -657,6 +658,6 @@ class TrajAnalysis(object):
 					mol = {"name":mol_prof.get("name"), "atom":mol_prof.get("atom")}
 					mol.update({"coordinate":np.vstack([self.trajcoord[frameid][l-1] for l in mol_prof.get("atomid")])})
 					molmatrix.update({moln:mol})
-			write_mol_matrix(molmatrix, os.path.join(self.getWorkPath(), "%s.pdb" % filename))
+			write_mol_matrix(molmatrix, os.path.join(self.get_save_path(), "%s.pdb" % filename), conect)
 		else:
-			raise ValueError("Wrong parameters. Function writeGroups expects two parameters, the former one to be a tuple list in which each element should be a pack of frame ID and molecular ID list and the latter one to be the wanted file name without suffix.")
+			raise ValueError("Wrong parameters. Function write_groups expects two parameters, the former one to be a tuple list in which each element should be a pack of frame ID and molecular ID list and the latter one to be the wanted file name without suffix.")

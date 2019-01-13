@@ -4,6 +4,7 @@ import numpy as np
 from gmx.io.csv import readline_csv_spec
 from gmx.other.input_func import convert_input_type
 from gmx.math.common import boxpara
+from gmx.chem.molecules import conect
 
 def readline_pdb(line, row):
 	assert isinstance(row, int), "Invalid row number."
@@ -235,11 +236,13 @@ def pdb2gro(pdb_path, csv_path, gro_path, maxsize = 209715200):
 def mol_matrix2pdb(mols, file_name = "frame"):
 	# Start counting
 	atomn, moln = 0, 0
-	write_atoms = []
+	atom_lines = []
 	# Write pdb file
-	for j in range(len(mols)):
+	molids = list(mols.keys())
+	molids.sort()
+	for j in molids:
 		moln += 1
-		mol = mols.get(j + 1)
+		mol = mols.get(j)
 		molid = mol.get("id")
 		moltype = mol.get("name")
 		atom = mol.get("atom")
@@ -263,6 +266,50 @@ def mol_matrix2pdb(mols, file_name = "frame"):
 			atom_line += '{0:>6.2f}'.format(20)
 			atom_line += ' ' * 10
 			atom_line += '{0:>3}'.format(atom[i][0])
-			write_atoms.append(atom_line)
+			atom_lines.append(atom_line)
 	with open(file_name + ".pdb", "w") as f:
-		f.writelines(line + '\n' for line in write_atoms)
+		f.writelines(line + '\n' for line in atom_lines)
+		f.write("END" + '\n')
+
+def mol_matrix2pdb_conect(mols, file_name = "frame"):
+	# Start counting
+	atomn, moln = 0, 0
+	atom_lines = []
+	conect_lines = []
+	# Write pdb file
+	molids = list(mols.keys())
+	molids.sort()
+	for j in molids:
+		moln += 1
+		mol = mols.get(j)
+		molid = mol.get("id")
+		moltype = mol.get("name")
+		atom = mol.get("atom")
+		coordinate = mol.get("coordinate")
+		conect_data = conect(moltype)
+		for term in conect_data:
+			conect_lines.append("CONECT" + ''.join(['{0:>5d}'.format(x + atomn) for x in term]))
+		for i in range(len(atom)):
+			x, y, z = coordinate[i] * 10
+			atomn += 1
+			atom_line = '{0:<6}'.format("HETATM")
+			atom_line += '{0:>5}'.format(atomn)
+			atom_line += ' '
+			atom_line += '{0:<4}'.format(atom[i])
+			atom_line += ' '
+			atom_line += '{0:>3}'.format(moltype)
+			atom_line += ' ' * 2
+			atom_line += '{0:>4}'.format(moln)
+			atom_line += ' ' * 4
+			atom_line += '{0:>8.3f}'.format(x)
+			atom_line += '{0:>8.3f}'.format(y)
+			atom_line += '{0:>8.3f}'.format(z)
+			atom_line += '{0:>6.2f}'.format(1)
+			atom_line += '{0:>6.2f}'.format(20)
+			atom_line += ' ' * 10
+			atom_line += '{0:>3}'.format(atom[i][0])
+			atom_lines.append(atom_line)
+	with open(file_name + ".pdb", "w") as f:
+		f.writelines(line + '\n' for line in atom_lines)
+		f.writelines(line + '\n' for line in conect_lines)
+		f.write("END" + '\n')
