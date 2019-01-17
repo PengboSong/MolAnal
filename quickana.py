@@ -78,7 +78,7 @@ def hbondgrp(moltypeA, moltypeB, start, end, lpdir = False, load_path = "frames"
 			mol_matrix.update({moln: mol})
 		write_mol_matrix(mol_matrix, os.path.join(save_path, frames_dir,
 			"%s+%s-frame%d.pdb" % (moltypeA.lower(), moltypeB.lower(), i)
-		))
+		), True)
 
 		framen += 1
 		manage_load.forward(1)
