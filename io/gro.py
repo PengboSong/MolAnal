@@ -188,17 +188,16 @@ def atom_matrix2gro(atoms, file_name = "frame", write_velocity = False):
 		atomtype = atom.get("name")
 		molid = atom.get("resid")
 		moltype = atom.get("resname")
-		coordinate = atom.get("coordinate")
-		velocity = atom.get("velocity")
+		x, y, z = atom.get("coordinate")
+		vx, vy, vz = atom.get("velocity")
 		# New molecule
 		if j == 1 or (j > 1 and (moltype != atoms.get(j-1).get("resname") or molid != atoms.get(j-1).get("resid"))):
 			moln += 1
+
+		atom_line = '{0:>5}{1:<4}  {2:>4}{3:>5}{4:>8.3f}{5:>8.3f}{6:>8.3f}'.format(moln, moltype, atomtype, atomn, x, y, z)
 		if write_velocity is True:
-			# TODO
-			write_atoms.append()
-		else:
-			# TODO
-			write_atoms.append()
+			atom_line += '{0:>8.3f}{1:>8.3f}{2:>8.3f}'.format(vx, vy, vz)
+			write_atoms.append(atom_line)
 	# Write gro file
 	with open(file_name + ".gro", "w") as f:
 		# Default title
@@ -207,7 +206,7 @@ def atom_matrix2gro(atoms, file_name = "frame", write_velocity = False):
 		f.write('{0:>5}'.format(atomn) + '\n')
 		f.writelines(line + '\n' for line in write_atoms)
 		# Solvate box parameters
-		f.write('{0:>10.5f}'.format(xbox) + '{0:>10.5f}'.format(ybox) + '{0:>10.5f}'.format(zbox) + '\n')
+		f.write('{0:>10.5f}{1:>10.5f}{2:>10.5f}'.format(xbox, ybox, zbox) + '\n')
 
 def mol_matrix2gro(mols, file_name = "frame", write_velocity = False):
 	# Start counting
@@ -229,18 +228,9 @@ def mol_matrix2gro(mols, file_name = "frame", write_velocity = False):
 			x, y, z = coordinate[i]
 			vx, vy, vz = velocity[i]
 			# Write velocity
-			atom_line = '{0:>5}'.format(moln)
-			atom_line += '{0:<4}'.format(moltype)
-			atom_line += ' ' * 2
-			atom_line += '{0:>4}'.format(atom[i])
-			atom_line += '{0:>5}'.format(atomn)
-			atom_line += '{0:>8.3f}'.format(x)
-			atom_line += '{0:>8.3f}'.format(y)
-			atom_line += '{0:>8.3f}'.format(z)
+			atom_line = '{0:>5}{1:<4}  {2:>4}{3:>5}{4:>8.3f}{5:>8.3f}{6:>8.3f}'.format(moln, moltype, atom[i], atomn, x, y, z)
 			if write_velocity is True:
-				atom_line += '{0:>8.3f}'.format(vx)
-				atom_line += '{0:>8.3f}'.format(vy)
-				atom_line += '{0:>8.3f}'.format(vz)
+				atom_line += '{0:>8.3f}{1:>8.3f}{2:>8.3f}'.format(vx, vy, vz)
 			write_atoms.append(atom_line)
 	with open(file_name + ".gro", "w") as f:
 		# Default title
@@ -249,4 +239,4 @@ def mol_matrix2gro(mols, file_name = "frame", write_velocity = False):
 		f.write('{0:>5}'.format(atomn) + '\n')
 		f.writelines(line + '\n' for line in write_atoms)
 		# Solvate box parameters
-		f.write('{0:>10.5f}'.format(xbox) + '{0:>10.5f}'.format(ybox) + '{0:>10.5f}'.format(zbox) + '\n')
+		f.write('{0:>10.5f}{1:>10.5f}{2:>10.5f}'.format(xbox, ybox, zbox) + '\n')

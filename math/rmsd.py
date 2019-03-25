@@ -52,9 +52,9 @@ def fitting(ref_mat, mol_mat, weight_factor):
 	for i in range(ndim):
 		for j in range(ndim):
 			for k in range(ndim):
-				uM[i][j] += bM[k][i] * aM[k][j]
+				uM[i][j] += bM[k][j] * aM[k][i]
 
-	new_matrix = np.dot(uM.transpose(), vectorY).transpose() + ref_center
+	new_matrix = np.dot(uM, vectorY).transpose() + ref_center
 	fit_rmsd = rmsd(ref_mat, new_matrix, weight_factor)
 	return new_matrix, fit_rmsd
 

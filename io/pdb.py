@@ -221,17 +221,17 @@ def pdb2gro(pdb_path, csv_path, gro_path, maxsize = 209715200):
 		f.write('{0:>5}'.format(len(lout)) + '\n')
 		new_lines = []
 		for term in lout:
-			this_x, this_y, this_z = term.get("coordinate")
-			term_line = '{0:>5}'.format(term.get("molecular_id") or " ")
-			term_line += '{0:<4}'.format(term.get("residual_name") or " ")
-			term_line += '{0:1}'.format(term.get("chain_identifier") or " ")
-			term_line += '{0:>4}'.format(term.get("atom_name") or " ")
-			term_line += '{0:>5}'.format(term.get("atom_serial_number") or " ")
-			term_line += '{0:>8.3f}'.format(this_x or " ") + '{0:>8.3f}'.format(this_y or " ") + '{0:>8.3f}'.format(this_z or " ")
+			molid = term.get("molecular_id") or " "
+			moltype = term.get("residual_name") or " "
+			chain = term.get("chain_identifier") or " "
+			atomtype = term.get("atom_name") or " "
+			atomid = term.get("atom_serial_number") or " "
+			x, y, z = term.get("coordinate")
+			term_line = '{0:>5}{1:<4}{2:1}{3:>4}{4:>5}{5:>8.3f}{6:>8.3f}{7:>8.3f}'.format(molid, moltype, chain, atomtype, atomid, x, y, z)
 			new_lines.append(term_line)
 		f.writelines(line + '\n' for line in term_lines)
 		# Solvate box parameters
-		f.write('{0:>10.5f}'.format(xbox) + '{0:>10.5f}'.format(ybox) + '{0:>10.5f}'.format(zbox) + '\n')
+		f.write('{0:>10.5f}{1:>10.5f}{2:>10.5f}'.format(xbox, ybox, zbox) + '\n')
 
 def mol_matrix2pdb(mols, file_name = "frame"):
 	# Start counting
@@ -250,22 +250,7 @@ def mol_matrix2pdb(mols, file_name = "frame"):
 		for i in range(len(atom)):
 			x, y, z = coordinate[i] * 10
 			atomn += 1
-			atom_line = '{0:<6}'.format("HETATM")
-			atom_line += '{0:>5}'.format(atomn)
-			atom_line += ' '
-			atom_line += '{0:<4}'.format(atom[i])
-			atom_line += ' '
-			atom_line += '{0:>3}'.format(moltype)
-			atom_line += ' ' * 2
-			atom_line += '{0:>4}'.format(moln)
-			atom_line += ' ' * 4
-			atom_line += '{0:>8.3f}'.format(x)
-			atom_line += '{0:>8.3f}'.format(y)
-			atom_line += '{0:>8.3f}'.format(z)
-			atom_line += '{0:>6.2f}'.format(1)
-			atom_line += '{0:>6.2f}'.format(20)
-			atom_line += ' ' * 10
-			atom_line += '{0:>3}'.format(atom[i][0])
+			atom_line = 'HETATM{0:>5} {1:<4} {2:>3}  {3:>4}    {4:>8.3f}{5:>8.3f}{6:>8.3f}{7:>6.2f}{8:>6.2f}          {9:>3}'.format(atomn, atom[i], moltype, moln, x, y, z, 1.0, 20.0, atom[i][0])
 			atom_lines.append(atom_line)
 	with open(file_name + ".pdb", "w") as f:
 		f.writelines(line + '\n' for line in atom_lines)
@@ -292,22 +277,7 @@ def mol_matrix2pdb_conect(mols, file_name = "frame"):
 		for i in range(len(atom)):
 			x, y, z = coordinate[i] * 10
 			atomn += 1
-			atom_line = '{0:<6}'.format("HETATM")
-			atom_line += '{0:>5}'.format(atomn)
-			atom_line += ' '
-			atom_line += '{0:<4}'.format(atom[i])
-			atom_line += ' '
-			atom_line += '{0:>3}'.format(moltype)
-			atom_line += ' ' * 2
-			atom_line += '{0:>4}'.format(moln)
-			atom_line += ' ' * 4
-			atom_line += '{0:>8.3f}'.format(x)
-			atom_line += '{0:>8.3f}'.format(y)
-			atom_line += '{0:>8.3f}'.format(z)
-			atom_line += '{0:>6.2f}'.format(1)
-			atom_line += '{0:>6.2f}'.format(20)
-			atom_line += ' ' * 10
-			atom_line += '{0:>3}'.format(atom[i][0])
+			atom_line = 'HETATM{0:>5} {1:<4} {2:>3}  {3:>4}    {4:>8.3f}{5:>8.3f}{6:>8.3f}{7:>6.2f}{8:>6.2f}          {9:>3}'.format(atomn, atom[i], moltype, moln, x, y, z, 1.0, 20.0, atom[i][0])
 			atom_lines.append(atom_line)
 	with open(file_name + ".pdb", "w") as f:
 		f.writelines(line + '\n' for line in atom_lines)
