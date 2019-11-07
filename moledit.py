@@ -2,7 +2,7 @@ import os, math, random
 import numpy as np
 
 from gmx.other.input_func import convert_input_type
-from gmx.structure.mol_matrix import write_mol_matrix
+from gmx.structure.mol_matrix import load_mol_matrix, write_mol_matrix
 
 from gmx.math.common import fitplane, rotate
 
@@ -10,7 +10,7 @@ from custom.general import listFiles
 
 class Moledit(object):
 	def __init__(self, frame):
-		self.mols = load_as_mol_matrix(frame)
+		self.mols = load_mol_matrix(frame)
 		self.parent_dir, self.frame_name = os.path.split(frame)
 		self.command()
 
@@ -129,5 +129,5 @@ class Moledit(object):
 		else:
 			frame_name = self.frame_name
 
-		write_mol_matrix(self.mols, os.path.join(self.parent_dir, frame_name))
+		write_mol_matrix(self.mols, os.path.join(self.parent_dir, frame_name), True)
 		print("[Info] File %s has been written successfully." % frame_name)

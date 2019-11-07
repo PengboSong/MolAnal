@@ -1,7 +1,7 @@
 import os.path
 import numpy as np
 
-from gmx.other.input_func import convert_input_type
+from gmx.other.input_func import *
 from gmx.math.common import boxpara
 
 def readline_gro(line, row):
