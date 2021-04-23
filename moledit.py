@@ -8,7 +8,7 @@ from gmx.math.common import fitplane, rotate
 
 from custom.general import listFiles
 
-class Moledit(object):
+class MolEdit(object):
 	def __init__(self, frame):
 		self.mols = load_mol_matrix(frame)
 		self.parent_dir, self.frame_name = os.path.split(frame)
@@ -124,7 +124,7 @@ class Moledit(object):
 		self.orrient(movemol, np.array([random.random() for i in range(3)]))
 
 	def write(self, copy = False):
-		if copy is True:
+		if copy:
 			frame_name = input("Please enter the name to save as:")
 		else:
 			frame_name = self.frame_name
