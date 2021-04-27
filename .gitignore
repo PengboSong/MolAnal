@@ -1,2 +1,6 @@
+# Exclude compiled pyc files
 __pycache__/*
 *.pyc
+
+# Exclude VS Code settings
+.vscode/*
