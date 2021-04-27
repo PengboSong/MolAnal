@@ -1,23 +1,24 @@
+# coding=utf-8
+
 import numpy as np
 
-from gmx.structure.matrix_shape import is_squared_matrix
 
-def upper_rmsd_matrix(matrix):
-	sequence = []
-	if is_squared_matrix(matrix):
-		for i in range(matrix.shape[0]):
-			sequence.extend(matrix[i][i + 1:].tolist())
-	return np.array(sequence)
+class SquaredMatrix(object):
+    def __init__(self, n, dtype):
+        self._N = n
+        self._sqmat = np.zeros((n, n), dtype=dtype)
 
-def reshape_rmsd_matrix(matrix):
-	rmsdSequence = []
-	if is_squared_matrix(matrix):
-		N = matrix.shape[0]
-		for i in range(N):
-			for j in range(i + 1, N):
-				rmsdSequence.append({"x":i, "y":j, "dist":matrix[i][j]})
-		rmsdSequence.sort(key = lambda obj: obj.get("dist"))
-		return rmsdSequence
-	else:
-		raise ValueError("Invalid format RMSD matrix received.")
-		return None
+    def upper_half(self):
+        """Return upper half of the squared matrix"""
+        upper = np.array([])
+        for i in range(self._N):
+            upper = np.append(upper, self._sqmat[i, i+1:])
+        return upper
+
+    def elements(self):
+        """Put every matrix elements into a seq with its i(row id) and j(column id)"""
+        pairseq = []
+        for i in range(self._N):
+            for j in range(i+1, self._N):
+                pairseq.append((i, j, self._sqmat[i, j]))
+        return pairseq
