@@ -88,7 +88,7 @@ def readline_pdb(line, row):
 		"residue_sequence_number":res_id,
 		"code_for_insertions_of_residues":code,
 		# Convert coordinate from angstrom to nanometer
-		"coordinate":np.array([x, y, z])/10,
+		"coordinate": [.1 * x, .1 * y, .1 * z],
 		"occupancy":occup,
 		"temperature_factor":temp_factor,
 		"segment_identifier":segment,
@@ -117,61 +117,6 @@ def pdb2atom_matrix(pdb_path, maxsize = 209715200):
 	else:
 		raise IOError("Can not load file %s." % pdb_path)
 	return atoms
-
-def pdb2coord_matrix(pdb_path, maxsize = 209715200):
-	# Initialize coordinate matrix
-	coords = []
-	# Load pdb file
-	if os.path.isfile(pdb_path) and os.path.splitext(pdb_path)[1] == ".pdb":
-		with open(pdb_path, 'r') as f:
-			rown = 0
-			for line in f.readlines(maxsize):
-				rown += 1
-				if line[0:6] in ("ATOM  ", "HETATM"):
-					coords.append(readline_pdb(line, rown).get("coordinate"))
-	else:
-		raise IOError("Can not load file %s." % pdb_path)
-	coords = np.vstack(coords)
-	return coords
-
-def pdb2mol_matrix(pdb_path, maxsize = 209715200):
-	# Initialize molecular matrix dict
-	mols = {}
-	# Load pdb file
-	if os.path.isfile(pdb_path) and os.path.splitext(pdb_path)[1] == ".pdb":
-		with open(pdb_path, 'r') as f:
-			# Start counting number of lines
-			rown, atomn = 0, 0
-			former = (0,"")
-			for line in f.readlines(maxsize):
-				if line[0:6] in ("ATOM  ", "HETATM"):
-					line_data = readline_pdb(line, rown)
-					# First molecule
-					if not former[0] and not former[1]:
-						mol_id = line_data.get("residue_sequence_number")
-						mol_name = line_data.get("residual_name")
-						mol_matrix = {"name":mol_name}
-						atom, coordinate, velocity = [], [], []
-					# Start a new molecule
-					elif former[0] != line_data.get("residue_sequence_number") or former[1] != line_data.get("residual_name"):
-						mol_matrix.update({"atom":atom, "coordinate":np.array(coordinate), "velocity":np.array(velocity)})
-						mols.update({mol_id:mol_matrix})
-						mol_id = line_data.get("residue_sequence_number")
-						mol_name = line_data.get("residual_name")
-						mol_matrix = {"name":mol_name}
-						atom, coordinate, velocity = [], [], []
-					# Common lines
-					atom.append(line_data.get("atom_name"))
-					coordinate.append(line_data.get("coordinate"))
-					# No velocity data in pdb file
-					velocity.append([0., 0., 0.])
-					former = (line_data.get("residue_sequence_number"), line_data.get("residual_name"))
-			# Complete the last molecular matrix
-			mol_matrix.update({"atom":atom, "coordinate":np.array(coordinate), "velocity":np.array(velocity)})
-			mols.update({mol_id:mol_matrix})
-	else:
-		raise IOError("Can not load file %s." % pdb_path)
-	return mols
 
 def pdb2gro(pdb_path, csv_path, gro_path, maxsize = 209715200):
 	# Initialize dict
@@ -232,54 +177,3 @@ def pdb2gro(pdb_path, csv_path, gro_path, maxsize = 209715200):
 		f.writelines(line + '\n' for line in term_lines)
 		# Solvate box parameters
 		f.write('{0:>10.5f}{1:>10.5f}{2:>10.5f}'.format(xbox, ybox, zbox) + '\n')
-
-def mol_matrix2pdb(mols, file_name = "frame"):
-	# Start counting
-	atomn, moln = 0, 0
-	atom_lines = []
-	# Write pdb file
-	molids = list(mols.keys())
-	molids.sort()
-	for j in molids:
-		moln += 1
-		mol = mols.get(j)
-		molid = mol.get("id")
-		moltype = mol.get("name")
-		atom = mol.get("atom")
-		coordinate = mol.get("coordinate")
-		for i in range(len(atom)):
-			x, y, z = coordinate[i] * 10
-			atomn += 1
-			atom_line = 'HETATM{0:>5} {1:<4} {2:>3}  {3:>4}    {4:>8.3f}{5:>8.3f}{6:>8.3f}{7:>6.2f}{8:>6.2f}          {9:>3}'.format(atomn, atom[i], moltype, moln, x, y, z, 1.0, 20.0, atom[i][0])
-			atom_lines.append(atom_line)
-	with open(file_name + ".pdb", "w") as f:
-		f.writelines(line + '\n' for line in atom_lines)
-		f.write("END" + '\n')
-
-def mol_matrix2pdb_conect(mols, file_name = "frame"):
-	# Start counting
-	atomn, moln = 0, 0
-	atom_lines = []
-	conect_lines = []
-	# Write pdb file
-	molids = list(mols.keys())
-	molids.sort()
-	for j in molids:
-		moln += 1
-		mol = mols.get(j)
-		molid = mol.get("id")
-		moltype = mol.get("name")
-		atom = mol.get("atom")
-		coordinate = mol.get("coordinate")
-		conect_data = conect(moltype)
-		for term in conect_data:
-			conect_lines.append("CONECT" + ''.join(['{0:>5d}'.format(x + atomn) for x in term]))
-		for i in range(len(atom)):
-			x, y, z = coordinate[i] * 10
-			atomn += 1
-			atom_line = 'HETATM{0:>5} {1:<4} {2:>3}  {3:>4}    {4:>8.3f}{5:>8.3f}{6:>8.3f}{7:>6.2f}{8:>6.2f}          {9:>3}'.format(atomn, atom[i], moltype, moln, x, y, z, 1.0, 20.0, atom[i][0])
-			atom_lines.append(atom_line)
-	with open(file_name + ".pdb", "w") as f:
-		f.writelines(line + '\n' for line in atom_lines)
-		f.writelines(line + '\n' for line in conect_lines)
-		f.write("END" + '\n')

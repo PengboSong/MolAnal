@@ -21,7 +21,7 @@ def boxpara(arrayxyz, extend=1.10):
     extend = max(extend, 1.0)
     # Check shape of arrayxyz
     if arrayxyz.ndim != 2 or arrayxyz.shape[1] != 3:
-        print('[ERROR] "boxpara" get wrong paramters.'
+        print('[WARNING] "boxpara" gets wrong paramters.'
               '"arrayxyz" should be a 2-dim matrix with 3 columns.')
         return 0., 0., 0.
 
@@ -68,8 +68,8 @@ def fitplane(pts):
 
     pts = np.asarray(pts, dtype="float64")
     if pts.ndim != 2 or pts.shape[0] < 3 or pts.shape[1] != 3:
-        print(
-            "[Error] Unsupported parameter given for plane function in function fitplane.")
+        raise ValueError('"fitplane" gets wrong parameters.'
+                         '"pts" should be a 2-dim matrix with 3 columns and at least 3 rows.')
 
     # Get the initial guess of normal vector from the first three points
     normal = np.cross(pts[1]-pts[0], pts[2]-pts[0])

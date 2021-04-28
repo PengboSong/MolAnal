@@ -3,7 +3,7 @@
 class ElementData(object):
     """Record element indexes, names and masses.
 
-    Including common elements: H-Kr, Ag, I, Au
+    Including common elements: H-Kr, Ag, I, Au.
     """
 
     def __init__(self):
@@ -12,9 +12,9 @@ class ElementData(object):
 
         # Add element infomation from periodic table
         self.add_element(1,  'H',    1.008)  # 1.00794
-        self.add_element(2,  'HE',   4.003)  # 4.0026
-        self.add_element(3,  'LI',   6.941)
-        self.add_element(4,  'BE',   9.012)  # 9.01218
+        self.add_element(2,  'He',   4.003)  # 4.0026
+        self.add_element(3,  'Li',   6.941)
+        self.add_element(4,  'Be',   9.012)  # 9.01218
         self.add_element(5,  'B',   10.811)
         self.add_element(6,  'C',   12.011)  # 12.0107
         self.add_element(7,  'N',   14.007)  # 14.0067
@@ -52,34 +52,51 @@ class ElementData(object):
         self.add_element(79, 'Au', 196.966)  # 196.96655
 
     def add_element(self, index, name, mass):
-        """Add element information to records."""
+        """Add element information to records"""
+        name = name.upper()
         self.elements[name] = {"index": index, "mass": mass}
         self.element_indexes[index] = {"name": name, "mass": mass}
 
     def index2element(self, i):
-        """Find element name by its index."""
+        """Find element name by its index"""
         if i in self.element_indexes:
             return self.element_indexes[i]["name"]
         else:
             return ''
 
     def index2mass(self, i):
-        """Find element mass by its index."""
+        """Find element mass by its index"""
         if i in self.element_indexes:
             return self.element_indexes[i]["mass"]
         else:
             return 0.
 
     def element2index(self, element):
-        """Find element name by its name."""
+        """Find element name by its name"""
         if element in self.elements:
             return self.elements[element]["index"]
         else:
             return 0
 
     def element2mass(self, element):
-        """Find element mass by its name."""
+        """Find element mass by its name"""
         if element in self.elements:
             return self.elements[element]["mass"]
         else:
             return 0.
+
+    def guess_element(self, atomnm):
+        """Guess element from atom name"""
+        atomnm = atomnm.upper()
+        if atomnm in self.elements:
+            return atomnm
+        elif atomnm[:2] in self.elements:
+            return atomnm[:2]
+        elif atomnm[0] in self.elements:
+            return atomnm[0]
+        else:
+            print("[WARNING] Failed to guess element from atom name %s." % atomnm)
+            return ''
+
+
+Elements = ElementData()

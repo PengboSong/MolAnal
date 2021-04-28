@@ -1,13 +1,57 @@
-import os.path
+# coding=utf-8
 
-from gmx.io.pdb import pdb2coord_matrix
-from gmx.io.gro import gro2coord_matrix
+import numpy as np
+from gmx.io.gro import readline_gro
+from gmx.io.pdb import readline_pdb
+from gmx.other.input_func import is_int
 
-def load_coord_matrix(frame_path):
-	frame_name, frame_format = os.path.splitext(frame_path)
-	if frame_format == ".pdb":
-		return pdb2coord_matrix(frame_path)
-	elif frame_format == ".gro":
-		return gro2coord_matrix(frame_path)
-	else:
-		return None
+from io_matrix import IOMatrix
+
+
+class CoordMatrix(IOMatrix):
+    def __init__(self):
+        self.atomn = 0
+        self.xyzs = np.array([], dtype="float64")
+
+    def append(self, x, y, z):
+        """Add atom coordinate to this matrix"""
+        self.atomn += 1
+        self.xyzs = np.append(self.xyzs, [x, y, z])
+
+    def clean(self):
+        """Convert coordinate matrix to matrix with 3 columns"""
+        self.xyzs = np.asarray(self.xyzs, dtype="float64").reshape(-1, 3)
+
+    def from_pdb(self, fpath):
+        """Read coordinate from PDB format file"""
+        with open(fpath, 'r') as f:
+            rown = 0
+            for line in f.readlines():
+                rown += 1
+                if line[0:6] in ("ATOM  ", "HETATM"):
+                    xyz = readline_pdb(line, rown)["coordinate"]
+                    self.append(*xyz)
+            self.clean()
+
+    def from_gro(self, fpath):
+        """Read coordinate from GRO format file"""
+        with open(fpath, 'r') as f:
+            f.readline()   # Skip title
+            # Second line should be an integer equals to total atom numbers
+            atomn = f.readline().strip()
+            if is_int(atomn):
+                atomn = int(atomn)
+            else:
+                raise ValueError('Unrecognized GRO format file. Expect ')
+            rown = 2
+            for line in f.readlines():
+                rown += 1
+                # Line 'atomn + 3' should be solvate box parameters
+                if rown < atomn + 3:
+                    xyz = readline_gro(line, rown)["coordinate"]
+                    self.append(*xyz)
+            self.clean()
+
+    def to_xyz(self, fpath):
+        """Write coordinate to XYZ format file"""
+        pass #TODO
