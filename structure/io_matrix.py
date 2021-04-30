@@ -11,7 +11,7 @@ class IOMatrix(object):
     GRO_FORMAT = "{0:>5}{1:<4}  {2:>4}{3:>5}{4:>8.3f}{5:>8.3f}{6:>8.3f}"
     GRO_VELOCITY = "{0:>8.3f}{1:>8.3f}{2:>8.3f}"
     # XYZ template line
-    XYZ_FORMAT = ""
+    XYZ_FORMAT = "{0:>8.3f}{1:>8.3f}{2:>8.3f}"
 
     def from_pdb(self, fpath):
         """Read data from PDB format file"""

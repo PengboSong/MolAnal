@@ -6,6 +6,7 @@ from gmx.io.gro import readline_gro
 from gmx.io.pdb import readline_pdb
 from gmx.math.common import boxpara
 from gmx.other.input_func import is_int
+from gmx.other.mol_order import MolOrder
 
 from io_matrix import IOMatrix
 
@@ -14,6 +15,7 @@ class SingleMol(object):
     def __init__(self, molid, molnm):
         self.i = molid
         self.nm = molnm
+        self.start_atomid = 0
         self.atomn = 0
         self.atoms = []
         self.elements = []
@@ -37,7 +39,7 @@ class SingleMol(object):
         """Write molecule to PDB format lines"""
         outbuf = ""
 
-        atomid = 0
+        atomid = self.start_atomid
         for atomnm, element, xyz in zip(self.atoms, self.elements, self.xyzs):
             atomid += 1
             outbuf += IOMatrix.PDB_FORMAT.format(
@@ -48,17 +50,15 @@ class SingleMol(object):
         """Write molecule to GRO format lines"""
         outbuf = ""
 
-        no_velo = True if np.linalg.norm(self.velos) < 1e-6 else False
+        with_velo = True if np.linalg.norm(self.velos) > 1e-6 else False
 
-        atomid = 0
+        atomid = self.start_atomid
         for atomnm, xyz, vxyz in zip(self.atoms, self.xyzs, self.velos):
             atomid += 1
             outbuf += IOMatrix.GRO_FORMAT.format(
                 self.i, self.nm, atomnm, atomid, *xyz)
-            if no_velo:
-                outbuf += '\n'
-            else:
-                outbuf += IOMatrix.GRO_VELOCITY.format(*vxyz) + '\n'
+            if with_velo:
+                outbuf += IOMatrix.GRO_VELOCITY.format(*vxyz)
         return outbuf
 
 
@@ -92,6 +92,7 @@ class MolMatrix(IOMatrix):
                     molkey = (resn, resnm)
             molmat.clean()
             self.mols.append(molmat)
+            self.resort(MolOrder.KEEP_ORDER)
 
     def from_gro(self, fpath):
         """Read molecules from GRO format file"""
@@ -130,26 +131,51 @@ class MolMatrix(IOMatrix):
                     molkey = (moln, molnm)
             molmat.clean()
             self.mols.append(molmat)
+            self.resort(MolOrder.KEEP_ORDER)
 
     def to_pdb(self, fpath):
         """Write molecules to PDB format file"""
         with open(fpath, 'w') as f:
-            f.writelines(molmat.to_pdb() for molmat in self.mols)
+            f.writelines(molmat.to_pdb() + '\n' for molmat in self.mols)
             f.write("END\n")
 
     def to_gro(self, fpath):
         """Write molecules to GRO format file"""
         system_xyzs = np.vstack([molmat.xyzs for molmat in self.mols])
-        xbox, ybox, zbox = boxpara(system_xyzs)
         total_atomn = system_xyzs.shape[0]
         with open(fpath, 'w') as f:
             # Default title
             f.write("GROtesk MACabre and Sinister\n")
             # Atom numbers
             f.write("{0:>5}\n".format(total_atomn))
-            f.writelines(molmat.to_gro() for molmat in self.mols)
+            f.writelines(molmat.to_gro() + '\n' for molmat in self.mols)
             # Solvate box parameters
-            f.write("{0:>10.5f}{1:>10.5f}{2:>10.5f}\n".format(xbox, ybox, zbox))
+            f.write("{0:>10.5f}{1:>10.5f}{2:>10.5f}\n".format(
+                *boxpara(system_xyzs)))
+
+    def resort(self, ordertype):
+        if ordertype not in MolOrder:
+            ordertype = MolOrder.KEEP_ORDER
+
+        count_atomn = 0
+        if ordertype == MolOrder.KEEP_ORDER:
+            for mol in self.mols:
+                mol.start_atomid = count_atomn
+                count_atomn += mol.atomn
+        elif ordertype in [MolOrder.MOL_ORDER, MolOrder.MOL_ORDER_ALPHA]:
+            molreindex = 0
+            mol_groups = self.clustering()
+            mol_types = mol_groups.keys() if ordertype == MolOrder.MOL_ORDER \
+                                          else sorted(mol_groups.keys())
+            for moltype in mol_types:
+                for j in mol_gsroups[moltype]:
+                    thismol = self.mols[j - 1]
+                    assert thismol.i == j
+                    molreindex += 1
+                    thismol.i = molreindex
+                    thismol.start_atomid = count_atomn
+                    count_atomn += mol.atomn
+            self.mols.sort(key=lambda mol: mol.i)
 
     def clustering(self):
         """Clustering molecules into groups based on molecular types"""

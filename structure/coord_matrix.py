@@ -54,4 +54,12 @@ class CoordMatrix(IOMatrix):
 
     def to_xyz(self, fpath):
         """Write coordinate to XYZ format file"""
-        pass #TODO
+        outbuf = ""
+
+        with open(fpath, 'w') as f:
+            for xyz in self.xyzs:
+                outbuf += IOMatrix.XYZ_FORMAT.format(*xyz)
+                # End line with LF
+                outbuf += '\n'
+            # End XYZ file with an extra empty line
+            f.write(outbuf + '\n')
