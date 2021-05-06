@@ -3,6 +3,7 @@
 import numpy as np
 from gmx.io.gro import readline_gro
 from gmx.io.pdb import readline_pdb
+from gmx.other.data_type import GMXDataType
 from gmx.other.input_func import is_int
 
 from io_matrix import IOMatrix
@@ -11,7 +12,7 @@ from io_matrix import IOMatrix
 class CoordMatrix(IOMatrix):
     def __init__(self):
         self.atomn = 0
-        self.xyzs = np.array([], dtype="float64")
+        self.xyzs = np.array([], dtype=GMXDataType.REAL)
 
     def append(self, x, y, z):
         """Add atom coordinate to this matrix"""
@@ -20,7 +21,15 @@ class CoordMatrix(IOMatrix):
 
     def clean(self):
         """Convert coordinate matrix to matrix with 3 columns"""
-        self.xyzs = np.asarray(self.xyzs, dtype="float64").reshape(-1, 3)
+        self.xyzs = np.asarray(self.xyzs, dtype=GMXDataType.REAL).reshape(-1, 3)
+    
+    def from_matrix(self, xyz):
+        """Pack a row matrix with 3 columns as coordinate matrix"""
+        if xyz.ndim == 2 and xyz.shape[1] == 3:
+            self.atomn = xyz.shape[0]
+            self.xyzs = xyz
+        else:
+            print("[WARNING] Input matrix can not be packed into a coordinate matrix.")
 
     def from_pdb(self, fpath):
         """Read coordinate from PDB format file"""

@@ -5,6 +5,7 @@ from gmx.chem.chem import Elements
 from gmx.io.gro import readline_gro
 from gmx.io.pdb import readline_pdb
 from gmx.math.common import boxpara
+from gmx.other.data_type import GMXDataType
 from gmx.other.input_func import is_int
 from gmx.other.mol_order import MolOrder
 
@@ -19,8 +20,8 @@ class SingleMol(object):
         self.atomn = 0
         self.atoms = []
         self.elements = []
-        self.xyzs = np.array([], dtype="float64")
-        self.velos = np.array([], dtype="float64")
+        self.xyzs = np.array([], dtype=GMXDataType.REAL)
+        self.velos = np.array([], dtype=GMXDataType.REAL)
 
     def append(self, atomnm, element, x, y, z, vx=0., vy=0., vz=0.):
         """Add atom record to this molecule"""
@@ -32,8 +33,8 @@ class SingleMol(object):
 
     def clean(self):
         """Convert coordinate and velocity matrix to matrix with 3 columns"""
-        self.xyzs = np.asarray(self.xyzs, dtype="float64").reshape(-1, 3)
-        self.velos = np.asarray(self.velos, dtype="float64").reshape(-1, 3)
+        self.xyzs = np.asarray(self.xyzs, dtype=GMXDataType.REAL).reshape(-1, 3)
+        self.velos = np.asarray(self.velos, dtype=GMXDataType.REAL).reshape(-1, 3)
 
     def to_pdb(self):
         """Write molecule to PDB format lines"""

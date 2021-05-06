@@ -3,6 +3,7 @@
 import math
 
 import numpy as np
+from gmx.other.data_type import GMXDataType
 
 
 def boxpara(arrayxyz, extend=1.10):
@@ -61,12 +62,12 @@ def fitplane(pts):
         Returns:
                 Distances from 
         """
-        p = np.asarray(p, dtype="float64")
-        pt = np.asarray([x, y, z], dtype="float64")
+        p = np.asarray(p, dtype=GMXDataType.REAL)
+        pt = np.asarray([x, y, z], dtype=GMXDataType.REAL)
         # CAN NOT use np.dot(pt, pt) to replace (x**2 + y**2 + z**2) - They are NOT equal
         return (np.dot(p, pt))/np.sqrt((p.dot(p) * (x**2 + y**2 + z**2)))
 
-    pts = np.asarray(pts, dtype="float64")
+    pts = np.asarray(pts, dtype=GMXDataType.REAL)
     if pts.ndim != 2 or pts.shape[0] < 3 or pts.shape[1] != 3:
         raise ValueError('"fitplane" gets wrong parameters.'
                          '"pts" should be a 2-dim matrix with 3 columns and at least 3 rows.')

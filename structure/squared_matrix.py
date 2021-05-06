@@ -1,12 +1,22 @@
 # coding=utf-8
 
 import numpy as np
+from gmx.other.data_type import GMXDataType
 
 
 class SquaredMatrix(object):
-    def __init__(self, n, dtype):
+    def __init__(self, n, dtype=GMXDataType.REAL):
         self._N = n
         self._sqmat = np.zeros((n, n), dtype=dtype)
+    
+    def __getitem__(self, i):
+        return self._sqmat[i]
+    
+    def __setitem__(self, i, val):
+        self._sqmat[i] = val
+
+    def copy(self):
+        return self._sqmat.copy()
 
     def upper_half(self):
         """Return upper half of the squared matrix"""
