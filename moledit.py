@@ -6,9 +6,9 @@ import os
 import numpy as np
 from custom.general import listFiles
 
-from gmx.math.common import fitplane, rotate
+from gmx.math.common import fitplane
+from gmx.other.command_line import ConsoleBase
 from gmx.other.data_type import GMXDataType
-from gmx.other.input_func import convert_input_type
 from gmx.other.register_func import RegisterFunction
 from gmx.structure.mol_matrix import MolMatrix
 

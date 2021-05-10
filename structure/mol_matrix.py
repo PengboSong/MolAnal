@@ -12,8 +12,7 @@ from gmx.math.rmsd import weight
 from gmx.other.data_type import GMXDataType
 from gmx.other.input_func import is_int
 from gmx.other.mol_order import MolOrder
-
-from io_matrix import IOMatrix
+from gmx.structure.io_matrix import IOMatrix
 
 
 class SingleMol(object):

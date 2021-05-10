@@ -20,7 +20,7 @@ def weight(x, weight_factor=None):
     """
     if weight_factor:
         weight_factor = np.asarray(weight_factor, dtype=GMXDataType.REAL).reshape(-1)
-        res = x * (weight_factor / np.sum(weight_factor)
+        res = x * (weight_factor / np.sum(weight_factor))
     else:
         res = np.mean(x)
     return res

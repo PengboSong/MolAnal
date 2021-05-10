@@ -6,8 +6,7 @@ from gmx.io.gro import readline_gro
 from gmx.io.pdb import readline_pdb
 from gmx.other.data_type import GMXDataType
 from gmx.other.input_func import is_int
-
-from io_matrix import IOMatrix
+from gmx.structure.io_matrix import IOMatrix
 
 
 class CoordMatrix(IOMatrix):
