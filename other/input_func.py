@@ -4,43 +4,6 @@ import collections
 import re
 
 
-def check_input_type(inp, typ, restrain=None):
-    if not isinstance(inp, typ):
-        return False
-    if restrain:
-        if isinstance(restrain, str):
-            exec("result = " + repr(inp) + restrain)
-            return result
-        if isinstance(restrain, (tuple, list)):
-            results = []
-            for term in restrain:
-                exec("results.append(" + repr(inp) + term + ")")
-            return all(results)
-    else:
-        return True
-
-
-def verify_type(typ, desc, restrain=None, msg="Invalid input."):
-    val = convert_input_type(input(desc))
-    while not check_input_type(val, typ, restrain):
-        print(msg)
-        val = convert_input_type(input(desc))
-    return val
-
-
-def verify_selection(ls, desc, msg="Invalid option."):
-    if not isinstance(ls, (list, dict, tuple)):
-        raise ValueError("Bad data type. Expect a list, a dict or a tuple.")
-    if isinstance(ls, dict):
-        for i in range(len(ls)):
-            print(format(i+1, 'd') + ':' + (ls.get(i+1) or "None"))
-    inp = convert_input_type(input(desc))
-    while inp not in ls:
-        print(msg)
-        inp = convert_input_type(input(desc))
-    return inp
-
-
 def is_int(string):
     """Check whether a string can be converted to an integer"""
     assert isinstance(
@@ -103,22 +66,10 @@ class SplitArgs(object):
                 return set(inlist)
 
     def digest(self, string):
-        """Digest input string and convert it to Python object.
-        
-        Splitted results are stored in a list. If list is empty, returns None.
-        If list has only one element, returns this element. Otherwise, returns
-        a full list with arguments in order.
-        """
+        """Digest input string and convert it to Python object"""
         # Reverse string characters order to pop character from last
         self.stringbuf = list(string.strip()[::-1])
-        res = self.handle()
-        self.clear()
-        if len(res) == 0:
-            return None
-        elif len(res) == 1:
-            return res[0]
-        else:
-            return res
+        return self.handle()
 
     def handle(self):
         """Convert substring to Python objects"""
@@ -176,5 +127,34 @@ class SplitArgs(object):
 
 
 def convert_input_type(string):
-    """Convert string to Python object(s)"""
-    return SplitArgs().digest(string)
+    """Convert string to Python object(s).
+
+    Splitted results are stored in a list. If list is empty, returns None.
+    If list has only one element, returns this element. Otherwise, returns
+    a full list with arguments in order.
+    """
+    res = SplitArgs().digest(string)
+    if len(res) == 0:
+        return None
+    elif len(res) == 1:
+        return res[0]
+    else:
+        return res
+
+
+def verify_selection(ls, desc):
+    if isinstance(ls, (list, tuple, set)):
+        for v in ls:
+            print('- {}'.format(v))
+    elif isinstance(ls, dict):
+        for k, v in ls.items():
+            print('{} : {}'.format(k, v))
+    else:
+        raise TypeError("Invalid selection list."
+                        "Valid types include list, set, tuple and dict.")
+    
+    inp = convert_input_type(input(desc))
+    while inp not in ls:
+        print("[Info] Got invalid option. Type again.")
+        inp = convert_input_type(input(desc))
+    return inp

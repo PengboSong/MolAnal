@@ -2,6 +2,7 @@
 
 import numpy as np
 from gmx.chem.chem import Elements
+from gmx.io.baseio import GMXDomains
 from gmx.io.gro import readline_gro
 from gmx.io.pdb import readline_pdb
 from gmx.math.common import boxpara
@@ -46,15 +47,15 @@ class AtomMatrix(IOMatrix):
                 rown += 1
                 if line[0:6] in ("ATOM  ", "HETATM"):
                     atominfo = readline_pdb(line, rown)
-                    resn = atominfo["residue_sequence_number"]
-                    resnm = atominfo["residual_name"]
+                    resn = atominfo[GMXDomains.RESID]
+                    resnm = atominfo[GMXDomains.RESNM]
                     # Start a new molecule
                     if molkey != (resn, resnm):
                         molreindex += 1
                     self.append(
-                        atominfo["atom_name"], atominfo["element_symbol"],
+                        atominfo[GMXDomains.ATOMNM], atominfo[GMXDomains.ELEMENT],
                         molreindex, resnm,
-                        *atominfo["coordinate"])
+                        *atominfo[GMXDomains.XYZ])
                     molkey = (resn, resnm)
             self.clean()
 
@@ -76,18 +77,18 @@ class AtomMatrix(IOMatrix):
                 # Line 'atomn + 3' should be solvate box parameters
                 if rown < atomn + 3:
                     atominfo = readline_gro(line, rown)
-                    moln = atominfo["mol_id"]
-                    molnm = atominfo["mol_name"]
+                    moln = atominfo[GMXDomains.MOLID]
+                    molnm = atominfo[GMXDomains.MOLNM]
                     # Start a new molecule
                     if molkey != (moln, molnm):
                         molreindex += 1
-                    atomnm = atominfo["atom_name"]
+                    atomnm = atominfo[GMXDomains.ATOMNM]
                     element = Elements.guess_element(atomnm)
                     self.append(
                         atomnm, element,
                         molreindex, molnm,
-                        *atominfo["coordinate"],
-                        *atominfo["velocity"])
+                        *atominfo[GMXDomains.XYZ],
+                        *atominfo[GMXDomains.VXYZ])
                     molkey = (moln, molnm)
             self.clean()
 

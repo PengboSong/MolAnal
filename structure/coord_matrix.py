@@ -1,6 +1,7 @@
 # coding=utf-8
 
 import numpy as np
+from gmx.io.baseio import GMXDomains
 from gmx.io.gro import readline_gro
 from gmx.io.pdb import readline_pdb
 from gmx.other.data_type import GMXDataType
@@ -38,7 +39,7 @@ class CoordMatrix(IOMatrix):
             for line in f.readlines():
                 rown += 1
                 if line[0:6] in ("ATOM  ", "HETATM"):
-                    xyz = readline_pdb(line, rown)["coordinate"]
+                    xyz = readline_pdb(line, rown)[GMXDomains.XYZ]
                     self.append(*xyz)
             self.clean()
 
@@ -51,13 +52,13 @@ class CoordMatrix(IOMatrix):
             if is_int(atomn):
                 atomn = int(atomn)
             else:
-                raise ValueError('Unrecognized GRO format file. Expect ')
+                raise ValueError('Unrecognized GRO format file. Expect an integer at line 2.')
             rown = 2
             for line in f.readlines():
                 rown += 1
                 # Line 'atomn + 3' should be solvate box parameters
                 if rown < atomn + 3:
-                    xyz = readline_gro(line, rown)["coordinate"]
+                    xyz = readline_gro(line, rown)[GMXDomains.XYZ]
                     self.append(*xyz)
             self.clean()
 

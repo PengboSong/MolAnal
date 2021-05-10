@@ -4,8 +4,8 @@ import re
 
 
 class ConsoleBase(object):
-    YES_PATTERN = re.compile(r"[yY][eE]?[sS]?")
-    NO_PATTERN = re.compile(r"[nN][oO]?")
+    YES_PATTERN = re.compile(r"^[yY][eE]?[sS]?$")
+    NO_PATTERN = re.compile(r"^[nN][oO]?$")
 
     def askyn(self, prompt):
         reply = input(prompt + "[Y(es)/N(o)]").strip()

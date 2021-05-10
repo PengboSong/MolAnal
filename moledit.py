@@ -2,10 +2,10 @@
 
 import math
 import os
-import random
 
 import numpy as np
 from custom.general import listFiles
+
 from gmx.math.common import fitplane, rotate
 from gmx.other.data_type import GMXDataType
 from gmx.other.input_func import convert_input_type
@@ -13,7 +13,7 @@ from gmx.other.register_func import RegisterFunction
 from gmx.structure.mol_matrix import MolMatrix
 
 
-class MolEdit(RegisterFunction):
+class MolEdit(ConsoleBase, RegisterFunction):
     PROMPT = "Molecules Editing for GROMACS"
     EXIT_PROMPT = "Press any key to exit..."
     PLACEHOLDER = ">>> "
@@ -23,36 +23,42 @@ class MolEdit(RegisterFunction):
         self.mols = MolMatrix()
         if frame:
             self.mols.from_file(frame)
-        self.parent_dir = os.path.dirname(frame)
-        self.frames = [os.path.basename(frame)]
+        self.frames = [frame]
+
+        self.register_("load_mol", self.load_mol, str)
+        self.register_("move", self.move, int, list)
+        self.register_("moveto", self.moveto, int, list)
+        self.register_("orrient", self.orrient, int, list)
+        self.register_("random_orrient", self.random_orrient, int)
+        self.register_("save", self.save)
+        self.register_("saveas", self.saveas, str)
+        self.register_("help", self.help_)
+        self.register_("exit", self.exit_)
     
     def __call__(self):
         """Initialize command-line interactive interface"""
         print(self.PROMPT)
-        cmd = input(self.PLACEHOLDER).strip()
-        lcmd = {"move":self.move, "moveto":self.moveto, "rotate":self.orrient, "random-rotate":self.random_orrient,"write":self.write}
         # Read commands from console
-        while cmd != "exit":
-            if cmd.split(" ")[0] not in lcmd.keys():
-                print("[Info] Unknown command.")
-            else:
-                try:
-                    lcmd.get(cmd.split(" ")[0])(*([convert_input_type(x) for x in cmd.split(" ")[1:]]))
-                except Exception as e:
-                    print("[Error] "+str(e)+".")
-            cmd = input(self.PLACEHOLDER).strip()
-        save_and_exit = input("Save modifications?(Y/N)").strip().upper()
-        while save_and_exit not in ("Y", "N"):
-            save_and_exit = input("Save modifications?(Y/N)").strip().upper()
-        if save_and_exit == "Y":
-            self.write()
+        EXIT_PATTERN = re.compile(r"[eE][xX][iI][tT]")
+        while not self.exit_signal_:
+            try:
+                self.launch_(input(self.PLACEHOLDER))
+            except Exception as err:
+                print("[Error] {}".format(err))
+        if self.askyn(prompt="Save modifications?"):
+            self.save()
 
     def load_mol(self, frame=''):
-        """Load another molecule/frame file into current molecule matrix"""
-        new_mol = MolMatrix()
-        if frame:
+        """Load another molecule/frame file into current molecule matrix.
+        
+        Args:
+            frame(str): Path to molecule/frame file.
+        """
+        if os.path.isfile(frame):
+            new_mol = MolMatrix()
             new_mol.from_file(frame)
-        self.mols.merge(new_mol)
+            self.mols.merge(new_mol)
+            self.frames.append(frame)
     
     def check_molid(self, molid):
         if molid > 0 and molid <= len(self.mols):
@@ -60,7 +66,7 @@ class MolEdit(RegisterFunction):
         else:
             return False
     
-    def cut(self, centermol = 1, shape = "sphere", parameter = (1.0,)):
+    def cut(self, centermol, shape="sphere", parameter=(1.0,)):
         """Cut molecules near central molecule within a custom shape."""
         # Check
         if self.check_molid(centermol):
@@ -87,8 +93,16 @@ class MolEdit(RegisterFunction):
         else:
             raise ValueError("Unsupported shape name: %s." % shape)
 
-    def move(self, movemol = 1, vector = [0., 0., 0.]):
-        """Move molecule by a specified vector"""
+    def move(self, movemol, vector):
+        """Move molecule by a specified vector.
+        
+        Args:
+            movemol(int): Index of molecule to move (start from 1).
+            vector(list[int*3]): Vector [vx, vy, vz] to move.
+
+        Raise:
+            ValueError: Molecule not found.
+        """
         # Check
         vector = np.asarray(vector, dtype=GMXDataType.REAL).reshape(-1)
         assert vector.size == 3, "Moving vector should be like [vx, vy, vz]."
@@ -97,8 +111,16 @@ class MolEdit(RegisterFunction):
         # Move
         self.mols[movemol].move(*vector)
 
-    def moveto(self, movemol = 1, point = [0., 0., 0.]):
-        """Move molecule center to a specified point"""
+    def moveto(self, movemol, point):
+        """Move molecule center to a specified point.
+        
+        Args:
+            movemol(int): Index of molecule to move (start from 1).
+            point(list[int*3]): Destination coordinate [x, y, z] of molecule center.
+
+        Raise:
+            ValueError: Molecule not found.
+        """
         # Check
         point = np.asarray(point, dtype=GMXDataType.REAL).reshape(-1)
         assert point.size == 3, "Moving target point should be like [x, y, z]."
@@ -109,41 +131,53 @@ class MolEdit(RegisterFunction):
         movevec = point - self.mols[movemol].center()
         self.mols[movemol].move(*movevec)
     
-    def orrient(self, rotmol = 1, axis = [0., 0., 1.]):
+    def orrient(self, rotmol, vector):
+        """Rotate molecule to a specified direction.
+        
+        Args:
+            rotmol(int): Index of molecule to rotate (start from 1).
+            axis(list[int*3]): Vector [vx, vy, vz] as the rotation direction.
+
+        Raise:
+            ValueError: Molecule not found.
+        """
         # Check
-        point = np.asarray(point, dtype=GMXDataType.REAL).reshape(-1)
-        assert point.size == 3, "Moving target point should be like [x, y, z]."
+        axis = np.asarray(axis, dtype=GMXDataType.REAL).reshape(-1)
+        assert axis.size == 3, "Rotation axis should be like [ax, ay, az]."
         if not self.check_molid(rotmol):
-            raise ValueError("Target molecule %d to move not found." % rotmol)
+            raise ValueError("Target molecule %d to rotate not found." % rotmol)
         # Normalize
-        vector = vector/math.sqrt(vector.dot(vector))
-        # Coordinate matrix of target molecule
-        molcoord = self.mols.get(movemol).get("coordinate")
-        center = np.average(molcoord, axis=0)
+        axis /= np.linalg.norm(axis)
         # Get the normal vector determined by molecular coordinates
-        plps = fitplane([v for v in molcoord])
-        normal = np.array(plps[0:3])
-        normal = normal/math.sqrt(normal.dot(normal))
+        plparms = fitplane(self.mols[rotmol].xyzs)[:3]
+        normal = np.asarray(plparms, dtype=GMXDataType.REAL)
+        normal /= np.linalg.norm(normal)
         # Rotation axis
         axis = np.cross(normal, vector)
-        axis = axis/math.sqrt(axis.dot(axis))
+        axis /= np.linglg.norm(axis)
         # Rotation angle
         cosang = np.dot(normal, vector)
-        sinang = math.sqrt(1-cosang**2)
+        sinang = math.sqrt(1 - cosang**2)
         # Rotate
-        newcoord = []
-        for i in range(len(molcoord)):
-            newcoord.append(rotate(molcoord[i]-center, axis, cosang, sinang) + center)
-        self.mols.get(movemol).update({"coordinate":np.array(newcoord)})
+        self.mols[rotmol].rotate(axis, cosang, sinang)
 
     def random_orrient(self, rotmol):
+        """Rotate molecule to a random direction.
+        
+        Args:
+            rotmol(int): Index of molecule to rotate (start from 1).
+
+        Raise:
+            ValueError: Molecule not found.
+        """
         self.orrient(rotmol=rotmol, axis=np.random.random(3, dtype=GMXDataType.REAL))
-
-    def write(self, copy = False):
-        if copy:
-            frame_name = input("Please enter the name to save as:")
-        else:
-            frame_name = self.frame_name
-
-        write_mol_matrix(self.mols, os.path.join(self.parent_dir, frame_name), True)
-        print("[Info] File %s has been written successfully." % frame_name)
+    
+    def save(self):
+        """Save to the first loaded molecule/frame file"""
+        if self.askyn(prompt="Confirm overwrite file {}?".format(self.frames[0])):
+            self.saveas(self.frames[0])
+    
+    def saveas(self, fpath):
+        """Write changed data to molecule/frame file"""
+        self.mols.to_file(fpath)
+        print("[Info] File {} has been written successfully.".format(fpath))

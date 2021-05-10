@@ -1,74 +1,31 @@
 # coding=utf-8
 
-from gmx.other.input_func import convert_input_type
+from gmx.io.baseio import GMXDomains, gmx_readline
+
+
+GRO_DOMAINS = {
+    # Short Name : Long Name, Start loc, End loc, type, type name, aligned
+    GMXDomains.MOLID:   ("Molecular id", 0, 5, str, "character", "right"),
+    GMXDomains.MOLNM:   ("Molecular name", 5, 8, int, "interger", "right"),
+    GMXDomains.CHAIN:   ("Chain identifier", 9, 10, str, "character", "none"),
+    GMXDomains.ATOMNM:  ("Atom name", 11, 15, str, "character", "right"),
+    GMXDomains.ATOMID:  ("Atom id", 15, 20, int, "interger", "right"),
+    GMXDomains.X:       ("Coordinate X(nm)", 20, 28, float, "real", "right"),
+    GMXDomains.Y:       ("Coordinate Y(nm)", 28, 36, float, "real", "right"),
+    GMXDomains.Z:       ("Coordinate Z(nm)", 36, 44, float, "real", "right"),
+    GMXDomains.VX:      ("Velocity X", 44, 52, float, "real", "right"),
+    GMXDomains.VY:      ("Velocity Y", 52, 60, float, "real", "right"),
+    GMXDomains.VZ:      ("Velocity Z", 60, 68, float, "real", "right"),
+}
 
 
 def readline_gro(line, row):
-    assert isinstance(row, int), "Invalid row number."
-    assert (isinstance(line, str) and len(line) >=
-            44), "Can not parse the given line at row %d." % row
-    # Read by column number
-    # Molecular id: 1-5, character, right
-    mol_id = convert_input_type(line[0:5].strip())
-    assert isinstance(
-        mol_id, int), "Molecular id at row %d column 1-5 is not an integer." % row
-
-    # Molecular name: 6-8, character, left
-    mol_name = convert_input_type(line[5:8].strip())
-    assert isinstance(
-        mol_name, str), "Molecular name at row %d column 6-8 is not characters." % row
-
-    # Chain identifier: 10, character
-    chain = convert_input_type(line[9:10].strip())
-    if chain:
-        assert isinstance(
-            chain, str), "Chain identifier at row %d column 10 is not a character." % row
-
-    # Atom name: 12-15, character, right
-    atom_name = convert_input_type(line[11:15].strip())
-    assert isinstance(
-        atom_name, str), "Atom name at row %d column 12-15 is not characters." % row
-
-    # Atom id: 16-20, integer, right
-    atom_id = convert_input_type(line[15:20].strip())
-    assert isinstance(
-        atom_id, int), "Atom id at row %d column 16-20 is not an integer." % row
-
-    # Coordinate X(A): 21-28, real(8:3), right
-    x = convert_input_type(line[20:28].strip())
-    assert isinstance(
-        x, float), "Coordinate X at row %d column 21-28 is not a real number." % row
-    # Coordinate Y(A): 29-36, real(8:3), right
-    y = convert_input_type(line[28:36].strip())
-    assert isinstance(
-        y, float), "Coordinate Y at row %d column 29-36 is not a real number." % row
-    # Coordinate Z(A): 37-44, real(8:3), right
-    z = convert_input_type(line[36:44].strip())
-    assert isinstance(
-        z, float), "Coordinate Z at row %d column 37-44 is not a real number." % row
-
-    if len(line.strip()) > 44:
-        # Velocity Vx: 45-52, read(8:4), right
-        vx = convert_input_type(line[44:52].strip())
-        assert isinstance(
-            vx, float), "Velocity Vx at row %d column 45-52 is not a real number." % row
-        # Velocity Vy: 53-60, read(8:4), right
-        vy = convert_input_type(line[52:60].strip())
-        assert isinstance(
-            vy, float), "Velocity Vy at row %d column 53-60 is not a real number." % row
-        # Velocity Vz: 61-68, read(8:4), right
-        vz = convert_input_type(line[60:68].strip())
-        assert isinstance(
-            vz, float), "Velocity Vz at row %d column 61-68 is not a real number." % row
-    else:
-        vx, vy, vz = 0., 0., 0.
-
-    return {
-        "mol_id": mol_id,
-        "mol_name": mol_name,
-        "chain": chain,
-        "atom_name": atom_name,
-        "atom_id": atom_id,
-        "coordinate": [x, y, z],
-        "velocity": [vx, vy, vz]
-    }
+    line = gmx_readline(line, row, domains=GRO_DOMAINS)
+    # Pack coordinate and velocity
+    line[GMXDomains.XYZ] = [line[GMXDomains.X],
+                            line[GMXDomains.Y],
+                            line[GMXDomains.Z]]
+    line[GMXDomains.VXYZ] = [line[GMXDomains.VX],
+                             line[GMXDomains.VY],
+                             line[GMXDomains.VZ]]
+    return line

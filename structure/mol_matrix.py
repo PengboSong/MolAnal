@@ -4,6 +4,7 @@ import math
 
 import numpy as np
 from gmx.chem.chem import Elements
+from gmx.io.baseio import GMXDomains
 from gmx.io.gro import readline_gro
 from gmx.io.pdb import readline_pdb
 from gmx.math.common import boxpara, rotate
@@ -84,7 +85,8 @@ class SingleMol(object):
         """
         axis = np.asarray(uaxis, dtype=GMXDataType.REAL)
         axis /= np.linalg.norm(axis)
-        self.xyzs = rotate(self.xyzs, axis, cosang, sinang)
+        center = self.center()
+        self.xyzs = rotate(self.xyzs - center, axis, cosang, sinang) + center
 
     def center(self, weight_factor=None):
         """Calculate central coordinate of molecules"""
@@ -118,8 +120,8 @@ class MolMatrix(IOMatrix):
                 rown += 1
                 if line[0:6] in ("ATOM  ", "HETATM"):
                     atominfo = readline_pdb(line, rown)
-                    resn = atominfo["residue_sequence_number"]
-                    resnm = atominfo["residual_name"]
+                    resn = atominfo[GMXDomains.RESID]
+                    resnm = atominfo[GMXDomains.RESNM]
                     # Start a new molecule
                     if molkey != (resn, resnm):
                         if molmat:
@@ -128,8 +130,8 @@ class MolMatrix(IOMatrix):
                         molreindex += 1
                         molmat = SingleMol(molreindex, resnm)
                     molmat.append(
-                        atominfo["atom_name"], atominfo["element_symbol"],
-                        *atominfo["coordinate"])
+                        atominfo[GMXDomains.ATOMNM], atominfo[GMXDomains.ELEMENT],
+                        *atominfo[GMXDomains.XYZ])
                     molkey = (resn, resnm)
             molmat.clean()
             self.mols.append(molmat)
@@ -154,8 +156,8 @@ class MolMatrix(IOMatrix):
                 # Line 'atomn + 3' should be solvate box parameters
                 if rown < atomn + 3:
                     atominfo = readline_gro(line, rown)
-                    moln = atominfo["mol_id"]
-                    molnm = atominfo["mol_name"]
+                    moln = atominfo[GMXDomains.MOLID]
+                    molnm = atominfo[GMXDomains.MOLNM]
                     # Start a new molecule
                     if molkey != (moln, molnm):
                         if molmat:
@@ -163,12 +165,12 @@ class MolMatrix(IOMatrix):
                             self.mols.append(molmat)
                         molreindex += 1
                         molmat = SingleMol(molreindex, molnm)
-                    atomnm = atominfo["atom_name"]
+                    atomnm = atominfo[GMXDomains.ATOMNM]
                     element = Elements.guess_element(atomnm)
                     molmat.append(
                         atomnm, element,
-                        *atominfo["coordinate"],
-                        *atominfo["velocity"])
+                        *atominfo[GMXDomains.XYZ],
+                        *atominfo[GMXDomains.VXYZ])
                     molkey = (moln, molnm)
             molmat.clean()
             self.mols.append(molmat)
