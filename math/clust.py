@@ -11,6 +11,7 @@ class Cluster(object):
         clusterid: For each of N particles, list which cluster it is assigned.
         cluster: List all clusters and their members.
     """
+
     def __init__(self, n):
         self._N = n
         self._distmat = SquaredMatrix(n=n, dtype=GMXDataType.REAL)
@@ -18,9 +19,18 @@ class Cluster(object):
         self.cluster = {}
 
     def set_distance(self, sqmat):
-        self._distmat = sqmat.copy()
+        """Set distance matrix from outside source"""
+        assert self._N == sqmat._N, "Source matrix should have the same size as this one."
+        self._distmat.copy_from(sqmat)
 
     def link(self, cutoff):
+        """Link clusters using given cutoff.
+        
+        If two particles have a distance less than cutoff, then these two
+        particles are clustered into one group. Generated clustered group
+        ids may be discontinuous, and clustered groups overview is not
+        generated.
+        """
         changed_status = True
         while (changed_status):
             changed_status = False
@@ -40,6 +50,7 @@ class Cluster(object):
                                 self.clusterid[x].update(yclust)
 
     def renum(self):
+        """Renumber clustered group ids and generate groups overview"""
         old_clusterid = list(set(self.clusterid))
         new_clusterid = list(range(1, len(old_clusterid) + 1))
         cluster_reindex = dict(zip(old_clusterid, new_clusterid))

@@ -15,8 +15,10 @@ class SquaredMatrix(object):
     def __setitem__(self, i, val):
         self._sqmat[i] = val
 
-    def copy(self):
-        return self._sqmat.copy()
+    def copy_from(self, other):
+        """Copy another squared matrix to this one, overwrite data"""
+        self._N = other._N
+        self._sqmat = other._sqmat.copy()
 
     def upper_half(self):
         """Return upper half of the squared matrix"""

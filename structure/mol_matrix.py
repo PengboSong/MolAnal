@@ -1,10 +1,13 @@
 # coding=utf-8
 
+import math
+
 import numpy as np
 from gmx.chem.chem import Elements
 from gmx.io.gro import readline_gro
 from gmx.io.pdb import readline_pdb
-from gmx.math.common import boxpara
+from gmx.math.common import boxpara, rotate
+from gmx.math.rmsd import weight
 from gmx.other.data_type import GMXDataType
 from gmx.other.input_func import is_int
 from gmx.other.mol_order import MolOrder
@@ -62,10 +65,47 @@ class SingleMol(object):
                 outbuf += IOMatrix.GRO_VELOCITY.format(*vxyz)
         return outbuf
 
+    def move(self, mvec):
+        """Move molecule by a vector.
+        
+        Args:
+            mvec: Shoule be a real vector like [mx, my, mz]
+        """
+        mvec = np.asarray(mvec, dtype=GMXDataType.REAL)
+        self.xyzs += mvec
+    
+    def rotate(self, uaxis, cosang, sinang):
+        """Rotate molecule deg degrees around an axis.
+        
+        Args:
+            uaxis: Axis vector. Should be a unit real vector like [ax, ay, az]
+            sinang: Sine value of rotation angle.
+            cosang: Cosine value of rotation angle.
+        """
+        axis = np.asarray(uaxis, dtype=GMXDataType.REAL)
+        axis /= np.linalg.norm(axis)
+        self.xyzs = rotate(self.xyzs, axis, cosang, sinang)
+
+    def center(self, weight_factor=None):
+        """Calculate central coordinate of molecules"""
+        if not weight_factor:
+            weight_factor = np.asarray(
+                [Elements.element2mass(e) for e in self.elements],
+                dtype=GMXDataType.REAL).reshape(-1)
+        if weight_factor.size != self.atomn:
+            raise ValueError("Weight factor should have same size of atom number.")
+        return weight(self.xyzs, weight_factor)        
+
 
 class MolMatrix(IOMatrix):
     def __init__(self):
         self.mols = []
+    
+    def __len__(self):
+        return len(self.mols)
+
+    def __getitem__(self, index):
+        return self.mols[index]
 
     def from_pdb(self, fpath):
         """Read molecules from PDB format file"""
@@ -169,7 +209,7 @@ class MolMatrix(IOMatrix):
             mol_types = mol_groups.keys() if ordertype == MolOrder.MOL_ORDER \
                                           else sorted(mol_groups.keys())
             for moltype in mol_types:
-                for j in mol_gsroups[moltype]:
+                for j in mol_groups[moltype]:
                     thismol = self.mols[j - 1]
                     assert thismol.i == j
                     molreindex += 1
@@ -191,3 +231,12 @@ class MolMatrix(IOMatrix):
         for molnm in groups:
             groups[molnm].sort()
         return groups
+    
+    def merge(self, other):
+        """Merge molecules from another MolMatrix into this molecule"""
+        molreindex = len(self.mols)
+        for mol in other.mols:
+            molreindex += 1
+            mol.i = molreindex
+            self.mols.append(mol)
+        self.resort(MolOrder.KEEP_ORDER)

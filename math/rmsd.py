@@ -6,7 +6,7 @@ import numpy as np
 from gmx.other.data_type import GMXDataType
 
 
-def weight(x, weight_factor):
+def weight(x, weight_factor=None):
     """Perform weighted average on x.
     
     Args:
@@ -18,7 +18,12 @@ def weight(x, weight_factor):
     Returns:
         Weighted average result of x.
     """
-    weight_factor = np.asarray(weight_factor, dtype=GMXDataType.REAL)
+    if weight_factor:
+        weight_factor = np.asarray(weight_factor, dtype=GMXDataType.REAL).reshape(-1)
+        res = x * (weight_factor / np.sum(weight_factor)
+    else:
+        res = np.mean(x)
+    return res
 
 
 def rmsd(ref_mat, mol_mat, weight_factor=None):
@@ -41,11 +46,7 @@ def rmsd(ref_mat, mol_mat, weight_factor=None):
     # N - Total number of atoms
     # x, y, z - X, Y, Z coordinates of atoms in current state
     # x0, y0, z0 - X, Y, Z coordinates of atoms in referenced state
-    if weight_factor:
-        rmsd_value = math.sqrt(np.sum(squared_length * weight_factor) / np.sum(weight_factor))
-    else:
-        rmsd_value = math.sqrt(np.mean(squared_length))
-    return rmsd_value
+    return math.sqrt(weight(squared_length, weight_factor))
 
 
 def fitting(ref_mat, mol_mat, weight_factor):
@@ -123,7 +124,6 @@ def rmsd_mol(coord_mat1, coord_mat2, weight_factor, fitting=True):
         RMSD value between two molecules/structures.
     """
     # Check parameters
-    weight_factor = np.asarray(weight_factor, dtype=GMXDataType.REAL).reshape(-1)
     if coord_mat1.atomn == coord_mat2.atomn and coord_mat1.atomn == weight_factor.size:
         if fitting:
             rot_coord_mat2, rmsd_value = fitting(coord_mat1, coord_mat1, weight_factor)
