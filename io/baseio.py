@@ -63,10 +63,13 @@ def gmx_readline(line, rown, domains, selected_domains=None):
     assert isinstance(line, str), "Can not parse line {}".format(line)
     assert isinstance(rown, int), "Invalid row number {} given".format(rown)
 
+    if not selected_domains:
+        selected_domains = domains.keys()
+
     domain_values = {}
     for domain in selected_domains:
         if domain in GMXDomains:
-            lname, sloc, eloc, vtype, typename = domain
+            lname, sloc, eloc, vtype, typename, _ = domains[domain]
             vcontent = line[sloc:eloc].strip()
             if len(vcontent) == 0:
                 vcontent = DEF_VALUES[typename]
@@ -115,13 +118,16 @@ def gmx_readline_sep(line, rown, domains, selected_domains=None, split_symbol=';
     assert isinstance(line, str), "Can not parse line {}".format(line)
     assert isinstance(rown, int), "Invalid row number {} given".format(rown)
 
+    if not selected_domains:
+        selected_domains = domains.keys()
+
     lineblocks = readline_sep(
         line, split_symbol=split_symbol, comment_symbol=comment_symbol)
 
     domain_values = {}
     for domain in selected_domains:
         if domain in GMXDomains:
-            lname, loc, vtype, typename = domain
+            lname, loc, vtype, typename, _ = domains[domain]
             try:
                 value = vtype(lineblocks[loc].strip())
                 domain_values.update({domain: value})

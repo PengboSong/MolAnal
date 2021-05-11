@@ -18,8 +18,9 @@ def is_float(string):
     """Check whether a string can be converted to a floating number"""
     assert isinstance(
         string, str), "Function is_float can only be used to check string."
-    floatp1 = re.compile(r"^[\+\-]? *[0-9]+\.[0-9]*[eE]?[\+\-]?[0-9]+$")
-    floatp2 = re.compile(r"^[\+\-]? *[0-9]*\.[0-9]+[eE]?[\+\-]?[0-9]+$")
+    floatp1 = re.compile(r"^[\+\-]? *[0-9]+\.[0-9]*[eE]?[\+\-]?[0-9]*$")
+    floatp2 = re.compile(r"^[\+\-]? *[0-9]*\.[0-9]+[eE]?[\+\-]?[0-9]*$")
+    string = string.strip()
     if re.match(floatp1, string) or re.match(floatp2, string):
         return True
     else:

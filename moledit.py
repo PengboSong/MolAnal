@@ -16,20 +16,24 @@ from gmx.structure.mol_matrix import MolMatrix
 class MolEdit(ConsoleBase, RegisterFunction):
     PROMPT = "Molecules Editing for GROMACS"
     EXIT_PROMPT = "Press any key to exit..."
-    PLACEHOLDER = ">>> "
+    PLACEHOLDER = "[MolEdit]>>> "
 
     def __init__(self, frame=''):
         super().__init__()
-        self.mols = MolMatrix()
-        if frame:
-            self.mols.from_file(frame)
-        self.frames = [frame]
+        self.molmat = MolMatrix()
+        self.frames = []
+        if os.path.isfile(frame):
+            self.molmat.from_file(frame)
+            self.frames.append(frame)
 
+        # Register functions
         self.register_("load_mol", self.load_mol, str)
+        self.register_("copy_mol", self.copy_mol, int)
         self.register_("move", self.move, int, list)
         self.register_("moveto", self.moveto, int, list)
         self.register_("orrient", self.orrient, int, list)
         self.register_("random_orrient", self.random_orrient, int)
+        self.register_("listmols", self.listmols)
         self.register_("save", self.save)
         self.register_("saveas", self.saveas, str)
         self.register_("help", self.help_)
@@ -39,14 +43,21 @@ class MolEdit(ConsoleBase, RegisterFunction):
         """Initialize command-line interactive interface"""
         print(self.PROMPT)
         # Read commands from console
-        EXIT_PATTERN = re.compile(r"[eE][xX][iI][tT]")
         while not self.exit_signal_:
+            #self.launch_(input(self.PLACEHOLDER))
             try:
                 self.launch_(input(self.PLACEHOLDER))
             except Exception as err:
                 print("[Error] {}".format(err))
-        if self.askyn(prompt="Save modifications?"):
-            self.save()
+        if len(self.frames) > 0:
+            if self.askyn(prompt="Save modifications?"):
+                self.save()
+    
+    def check_molid(self, molid):
+        if molid > 0 and molid <= len(self.molmat):
+            return True
+        else:
+            return False
 
     def load_mol(self, frame=''):
         """Load another molecule/frame file into current molecule matrix.
@@ -57,29 +68,38 @@ class MolEdit(ConsoleBase, RegisterFunction):
         if os.path.isfile(frame):
             new_mol = MolMatrix()
             new_mol.from_file(frame)
-            self.mols.merge(new_mol)
+            self.molmat.merge(new_mol)
             self.frames.append(frame)
     
-    def check_molid(self, molid):
-        if molid > 0 and molid <= len(self.mols):
-            return True
-        else:
-            return False
+    def copy_mol(self, copymol):
+        """Copy a selected molecule.
+        
+        Args:
+            copymol(int): Index of molecule to copy (start from 1).
+
+        Raise:
+            ValueError: Molecule not found.
+        """
+        # Check
+        if not self.check_molid(copymol):
+            raise ValueError("Target molecule %d to cut not found." % copymol)
+        newmol = self.molmat[copymol - 1].copy()
+        self.molmat.append(newmol)
     
     def cut(self, centermol, shape="sphere", parameter=(1.0,)):
         """Cut molecules near central molecule within a custom shape."""
         # Check
-        if self.check_molid(centermol):
+        if not self.check_molid(centermol):
             raise ValueError("Target molecule %d to cut not found." % centermol)
         # Calculate coordinate of target molecular center
-        center = self.mols[centermol - 1].center()
+        center = self.molmat[centermol - 1].center()
         # Cut a sphere around target molecular center
         if shape == "sphere":
             inside = MolMatrix()
             outside = MolMatrix()
             radius = parameter[0]
             # Scan all molecules
-            for mol in self.mols:
+            for mol in self.molmat:
                 if mol.i == centermol:
                     continue
                 else:
@@ -109,7 +129,7 @@ class MolEdit(ConsoleBase, RegisterFunction):
         if not self.check_molid(movemol):
             raise ValueError("Target molecule %d to move not found." % movemol)
         # Move
-        self.mols[movemol].move(*vector)
+        self.molmat[movemol - 1].move(vector)
 
     def moveto(self, movemol, point):
         """Move molecule center to a specified point.
@@ -128,8 +148,8 @@ class MolEdit(ConsoleBase, RegisterFunction):
             raise ValueError("Target molecule %d to move not found." % movemol)
         # Move target molecule to destination
         # The molecule goes to where its center overlap the point
-        movevec = point - self.mols[movemol].center()
-        self.mols[movemol].move(*movevec)
+        movevec = point - self.molmat[movemol - 1].center()
+        self.molmat[movemol - 1].move(movevec)
     
     def orrient(self, rotmol, vector):
         """Rotate molecule to a specified direction.
@@ -142,24 +162,26 @@ class MolEdit(ConsoleBase, RegisterFunction):
             ValueError: Molecule not found.
         """
         # Check
-        axis = np.asarray(axis, dtype=GMXDataType.REAL).reshape(-1)
-        assert axis.size == 3, "Rotation axis should be like [ax, ay, az]."
+        vector = np.asarray(vector, dtype=GMXDataType.REAL).reshape(-1)
+        assert vector.size == 3, "Direction vector should be like [ax, ay, az]."
         if not self.check_molid(rotmol):
             raise ValueError("Target molecule %d to rotate not found." % rotmol)
         # Normalize
-        axis /= np.linalg.norm(axis)
+        vector /= np.linalg.norm(vector)
         # Get the normal vector determined by molecular coordinates
-        plparms = fitplane(self.mols[rotmol].xyzs)[:3]
+        plparms = fitplane(self.molmat[rotmol - 1].xyzs)[:3]
         normal = np.asarray(plparms, dtype=GMXDataType.REAL)
         normal /= np.linalg.norm(normal)
-        # Rotation axis
-        axis = np.cross(normal, vector)
-        axis /= np.linglg.norm(axis)
         # Rotation angle
-        cosang = np.dot(normal, vector)
+        cosang = min(1., max(-1., np.dot(normal, vector)))   # Cosine in range [-1., 1.]
         sinang = math.sqrt(1 - cosang**2)
-        # Rotate
-        self.mols[rotmol].rotate(axis, cosang, sinang)
+        if (1. - cosang) < 1e-3:   # No need to rotate
+            pass
+        else:
+            # Rotation axis
+            axis = np.cross(normal, vector)
+            # Rotate
+            self.molmat[rotmol - 1].rotate(axis, cosang, sinang)
 
     def random_orrient(self, rotmol):
         """Rotate molecule to a random direction.
@@ -172,6 +194,11 @@ class MolEdit(ConsoleBase, RegisterFunction):
         """
         self.orrient(rotmol=rotmol, axis=np.random.random(3, dtype=GMXDataType.REAL))
     
+    def listmols(self):
+        """List all molecules in system"""
+        for molnm, molids in self.molmat.clustering().items():
+            print('- {} : {}'.format(molnm, ', '.join(str(i) for i in molids)))
+    
     def save(self):
         """Save to the first loaded molecule/frame file"""
         if self.askyn(prompt="Confirm overwrite file {}?".format(self.frames[0])):
@@ -179,5 +206,5 @@ class MolEdit(ConsoleBase, RegisterFunction):
     
     def saveas(self, fpath):
         """Write changed data to molecule/frame file"""
-        self.mols.to_file(fpath)
+        self.molmat.to_file(fpath)
         print("[Info] File {} has been written successfully.".format(fpath))

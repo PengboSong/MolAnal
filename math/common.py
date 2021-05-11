@@ -117,11 +117,12 @@ def rotateMatrix(axis, cosang, sinang):
     Returns:
             A 3x3 rotation matrix, which should be a unitary matrix.
     """
-    axis = axis / math.sqrt(axis.dot(axis))
+    if np.linalg.norm(axis) > 1e-6:
+        axis /= np.linalg.norm(axis)
     x, y, z = axis
     return (1 - cosang) * np.outer(axis, axis) + \
-        sinang * np.array([[0, -z, y], [z, 0, -x], [-y, x, 0]]) + \
-        cosang * np.eye(3)
+        sinang * np.array([[0, -z, y], [z, 0, -x], [-y, x, 0]], dtype=GMXDataType.REAL) + \
+        cosang * np.eye(3, dtype=GMXDataType.REAL)
 
 
 def convertSeconds(sec):

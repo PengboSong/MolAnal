@@ -18,11 +18,11 @@ def weight(x, weight_factor=None):
     Returns:
         Weighted average result of x.
     """
-    if weight_factor:
-        weight_factor = np.asarray(weight_factor, dtype=GMXDataType.REAL).reshape(-1)
-        res = x * (weight_factor / np.sum(weight_factor))
+    if isinstance(weight_factor, np.ndarray) and weight_factor.size == x.shape[0]:
+        weight_factor /= np.sum(weight_factor)
+        res = np.dot(weight_factor, x)
     else:
-        res = np.mean(x)
+        res = np.mean(x, axis=0)
     return res
 
 
@@ -64,28 +64,25 @@ def fitting(ref_mat, mol_mat, weight_factor):
         Calculated RMSD value.
     """
     # Calculate vectors from origin to centers of molecules
-    
-    broad_weight_factor = np.array(
-        [weight_factor, weight_factor, weight_factor]).transpose()
-    ref_center = np.average(ref_mat * broad_weight_factor, axis=0)
-    mod_center = np.average(mol_mat * broad_weight_factor, axis=0)
+    ref_center = weight(ref_mat, weight_factor)
+    mol_center = weight(mol_mat, weight_factor)
 
     # Translate two matrixes to align centers of the two molecules to the origin
     trans_ref_matrix = ref_mat - ref_center
-    trans_mod_matrix = mol_mat - mod_center
+    trans_mod_matrix = mol_mat - mol_center
 
     # Rotate the latter matrix to fit with the least RMSD
 
     # Derive unitary rotation matrix
-    ndim = 3
+    NDIM = 3
     vectorX = trans_ref_matrix.transpose()
     vectorY = trans_mod_matrix.transpose()
     lenVector = vectorX.shape[1]
 
-    rM = np.zeros((ndim, ndim), dtype=GMXDataType.REAL)
+    rM = np.zeros((NDIM, NDIM), dtype=GMXDataType.REAL)
 
-    for i in range(ndim):
-        for j in range(ndim):
+    for i in range(NDIM):
+        for j in range(NDIM):
             for k in range(lenVector):
                 rM[i][j] += weight_factor[k] * vectorY[i][k] * vectorX[j][k]
 
@@ -96,13 +93,13 @@ def fitting(ref_mat, mol_mat, weight_factor):
     bM = np.dot(rM, eigVectors) / np.sqrt(eigValues)
     aM = eigVectors.transpose()
 
-    uM = np.zeros((ndim, ndim), dtype=GMXDataType.REAL)  # unitary rotation matrix
+    uM = np.zeros((NDIM, NDIM), dtype=GMXDataType.REAL)  # unitary rotation matrix
     # UX = Y
     # U'Y = X
 
-    for i in range(ndim):
-        for j in range(ndim):
-            for k in range(ndim):
+    for i in range(NDIM):
+        for j in range(NDIM):
+            for k in range(NDIM):
                 uM[i][j] += bM[k][j] * aM[k][i]
 
     new_matrix = np.dot(uM, vectorY).transpose() + ref_center
@@ -124,6 +121,7 @@ def rmsd_mol(coord_mat1, coord_mat2, weight_factor, fitting=True):
         RMSD value between two molecules/structures.
     """
     # Check parameters
+    weight_factor = np.asarray(weight_factor, dtype=GMXDataType.REAL).reshape(-1)
     if coord_mat1.atomn == coord_mat2.atomn and coord_mat1.atomn == weight_factor.size:
         if fitting:
             rot_coord_mat2, rmsd_value = fitting(coord_mat1, coord_mat1, weight_factor)

@@ -128,6 +128,7 @@ class AtomMatrix(IOMatrix):
                     outbuf += IOMatrix.GRO_VELOCITY.format(*vxyz)
                 # End line with LF
                 outbuf += '\n'
+            f.write(outbuf)
             # Solvate box parameters
             f.write("{0:>10.5f}{1:>10.5f}{2:>10.5f}\n".format(
                 *boxpara(self.xyzs)))

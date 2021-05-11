@@ -6,7 +6,7 @@ import os
 class IOMatrix(object):
     # PDB template line
     PDB_FORMAT = ("HETATM{0:>5} {1:<4} {2:>3}  {3:>4}    {4:>8.3f}{5:>8.3f}{6:>8.3f}"
-                  "{7:>6.2f}{8:>6.2f}          {9:>3}\n")
+                  "{7:>6.2f}{8:>6.2f}          {9:>3}")
     # GRO template line
     GRO_FORMAT = "{0:>5}{1:<4}  {2:>4}{3:>5}{4:>8.3f}{5:>8.3f}{6:>8.3f}"
     GRO_VELOCITY = "{0:>8.3f}{1:>8.3f}{2:>8.3f}"

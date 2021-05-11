@@ -38,6 +38,16 @@ class SingleMol(object):
         """Convert coordinate and velocity matrix to matrix with 3 columns"""
         self.xyzs = np.asarray(self.xyzs, dtype=GMXDataType.REAL).reshape(-1, 3)
         self.velos = np.asarray(self.velos, dtype=GMXDataType.REAL).reshape(-1, 3)
+    
+    def copy(self):
+        """Returns a copy of this molecule, molecule id set to 0"""
+        newmol = SingleMol(molid=0, molnm=self.nm)
+        newmol.atomn = self.atomn
+        newmol.atoms = self.atoms.copy()
+        newmol.elements = self.elements.copy()
+        newmol.xyzs = self.xyzs.copy()
+        newmol.velos = self.xyzs.copy()
+        return newmol
 
     def to_pdb(self):
         """Write molecule to PDB format lines"""
@@ -47,7 +57,9 @@ class SingleMol(object):
         for atomnm, element, xyz in zip(self.atoms, self.elements, self.xyzs):
             atomid += 1
             outbuf += IOMatrix.PDB_FORMAT.format(
-                atomid, atomnm, self.nm, self.i, *xyz, 1., 0., element)
+                atomid, atomnm, self.nm, self.i, *(xyz * 10.), 1., 0., element)
+            # End line with LF
+            outbuf += '\n'
         return outbuf
 
     def to_gro(self):
@@ -63,6 +75,8 @@ class SingleMol(object):
                 self.i, self.nm, atomnm, atomid, *xyz)
             if with_velo:
                 outbuf += IOMatrix.GRO_VELOCITY.format(*vxyz)
+            # End line with LF
+            outbuf += '\n'
         return outbuf
 
     def move(self, mvec):
@@ -71,21 +85,21 @@ class SingleMol(object):
         Args:
             mvec: Shoule be a real vector like [mx, my, mz]
         """
-        mvec = np.asarray(mvec, dtype=GMXDataType.REAL)
+        mvec = np.asarray(mvec, dtype=GMXDataType.REAL).reshape(3)
         self.xyzs += mvec
     
-    def rotate(self, uaxis, cosang, sinang):
+    def rotate(self, axis, cosang, sinang):
         """Rotate molecule deg degrees around an axis.
         
         Args:
-            uaxis: Axis vector. Should be a unit real vector like [ax, ay, az]
+            axis: Axis vector. Should be a unit real vector like [ax, ay, az]
             sinang: Sine value of rotation angle.
             cosang: Cosine value of rotation angle.
         """
-        axis = np.asarray(uaxis, dtype=GMXDataType.REAL)
-        axis /= np.linalg.norm(axis)
+        axis = np.asarray(axis, dtype=GMXDataType.REAL)
         center = self.center()
-        self.xyzs = rotate(self.xyzs - center, axis, cosang, sinang) + center
+        centered_xyzs = (self.xyzs - center).transpose()
+        self.xyzs = rotate(centered_xyzs, axis, cosang, sinang).transpose() + center
 
     def center(self, weight_factor=None):
         """Calculate central coordinate of molecules"""
@@ -178,7 +192,7 @@ class MolMatrix(IOMatrix):
     def to_pdb(self, fpath):
         """Write molecules to PDB format file"""
         with open(fpath, 'w') as f:
-            f.writelines(molmat.to_pdb() + '\n' for molmat in self.mols)
+            f.writelines(molmat.to_pdb() for molmat in self.mols)
             f.write("END\n")
 
     def to_gro(self, fpath):
@@ -190,12 +204,12 @@ class MolMatrix(IOMatrix):
             f.write("GROtesk MACabre and Sinister\n")
             # Atom numbers
             f.write("{0:>5}\n".format(total_atomn))
-            f.writelines(molmat.to_gro() + '\n' for molmat in self.mols)
+            f.writelines(molmat.to_gro() for molmat in self.mols)
             # Solvate box parameters
             f.write("{0:>10.5f}{1:>10.5f}{2:>10.5f}\n".format(
                 *boxpara(system_xyzs)))
 
-    def resort(self, ordertype):
+    def resort(self, ordertype=None):
         if ordertype not in MolOrder:
             ordertype = MolOrder.KEEP_ORDER
 
@@ -218,6 +232,12 @@ class MolMatrix(IOMatrix):
                     thismol.start_atomid = count_atomn
                     count_atomn += mol.atomn
             self.mols.sort(key=lambda mol: mol.i)
+    
+    def append(self, mol):
+        assert isinstance(mol, SingleMol), "MolMatrix can only append SingleMol object."
+        mol.i = len(self.mols) + 1
+        self.mols.append(mol)
+        self.resort(MolOrder.KEEP_ORDER)
 
     def clustering(self):
         """Clustering molecules into groups based on molecular types"""
