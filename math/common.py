@@ -6,29 +6,38 @@ import numpy as np
 from gmx.other.data_type import GMXDataType
 
 
-def boxpara(arrayxyz, extend=1.10):
+def boxpara(arrayxyz, extend=[1., 1., 1.]):
     """Calculating solvation box parameters.
 
     Args:
             arrayxyz: A 2-dim array containing XYZ of all atoms in system.
             extend: Factor that controls how large the solvation box will be.
                     Should be no less than 1, otherwise the box is not large
-                            enough to contain all atoms.
+                    enough to contain all atoms.
 
     Returns:
-            Length of solvation box in X, Y and Z axes.
+            Length of solvation box in X, Y and Z axes, and shift vector to fit
+            the new box.
     """
     # Extend should be no less than 1
-    extend = max(extend, 1.0)
+    extend = np.asarray(extend, dtype=GMXDataType.REAL)
+    extend[extend < 1.] = 1.
     # Check shape of arrayxyz
+    resizebox = np.zeros(3, dtype=GMXDataType.REAL)
+    shift = np.zeros(3, dtype=GMXDataType.REAL)
     if arrayxyz.ndim != 2 or arrayxyz.shape[1] != 3:
         print('[WARNING] "boxpara" gets wrong paramters.'
               '"arrayxyz" should be a 2-dim matrix with 3 columns.')
-        return 0., 0., 0.
-
-    xmin, ymin, zmin = np.min(arrayxyz, axis=0)
-    xmax, ymax, zmax = np.max(arrayxyz, axis=0)
-    return (xmax-xmin) * (1+extend), (ymax-ymin) * (1+extend), (zmax-zmin) * (1+extend)
+    elif extend.size != 3:
+        print('[WARNING] "boxpara" gets wrong paramters.'
+              '"extend" should be a vector with 3 elements.')
+    else:
+        xyzmin = np.min(arrayxyz, axis=0)
+        xyzmax = np.max(arrayxyz, axis=0)
+        basebox = xyzmax - xyzmin
+        resizebox[:] = basebox * extend
+        shift[:] = resizebox - basebox - xyzmin
+    return resizebox, shift
 
 
 def fitplane(pts):

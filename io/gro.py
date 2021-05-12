@@ -5,8 +5,8 @@ from gmx.io.baseio import GMXDomains, gmx_readline
 
 GRO_DOMAINS = {
     # Short Name : Long Name, Start loc, End loc, type, type name, aligned
-    GMXDomains.MOLID:   ("Molecular id", 0, 5, str, "character", "right"),
-    GMXDomains.MOLNM:   ("Molecular name", 5, 8, int, "interger", "right"),
+    GMXDomains.MOLID:   ("Molecular id", 0, 5, int, "interger", "right"),
+    GMXDomains.MOLNM:   ("Molecular name", 5, 8, str, "character", "right"),
     GMXDomains.CHAIN:   ("Chain identifier", 9, 10, str, "character", "none"),
     GMXDomains.ATOMNM:  ("Atom name", 11, 15, str, "character", "right"),
     GMXDomains.ATOMID:  ("Atom id", 15, 20, int, "interger", "right"),
@@ -25,7 +25,8 @@ def readline_gro(line, row):
     line[GMXDomains.XYZ] = [line[GMXDomains.X],
                             line[GMXDomains.Y],
                             line[GMXDomains.Z]]
-    line[GMXDomains.VXYZ] = [line[GMXDomains.VX],
-                             line[GMXDomains.VY],
-                             line[GMXDomains.VZ]]
+    if GMXDomains.VX in line and GMXDomains.VY in line and GMXDomains.VZ in line:
+        line[GMXDomains.VXYZ] = [line[GMXDomains.VX],
+                                line[GMXDomains.VY],
+                                line[GMXDomains.VZ]]
     return line

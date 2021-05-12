@@ -9,6 +9,7 @@ from custom.general import listFiles
 from gmx.math.common import fitplane
 from gmx.other.command_line import ConsoleBase
 from gmx.other.data_type import GMXDataType
+from gmx.other.mol_order import MolOrder
 from gmx.other.register_func import RegisterFunction
 from gmx.structure.mol_matrix import MolMatrix
 
@@ -34,21 +35,25 @@ class MolEdit(ConsoleBase, RegisterFunction):
         self.register_("orrient", self.orrient, int, list)
         self.register_("random_orrient", self.random_orrient, int)
         self.register_("listmols", self.listmols)
+        self.register_("resort", self.resort)
         self.register_("save", self.save)
         self.register_("saveas", self.saveas, str)
         self.register_("help", self.help_)
         self.register_("exit", self.exit_)
+
+        self.register_("genbox", self.molmat.genbox, [int, float, list])
+        self.register_("extend-z", self.molmat.extend_z, [int, float])
     
     def __call__(self):
         """Initialize command-line interactive interface"""
         print(self.PROMPT)
         # Read commands from console
         while not self.exit_signal_:
-            #self.launch_(input(self.PLACEHOLDER))
-            try:
-                self.launch_(input(self.PLACEHOLDER))
-            except Exception as err:
-                print("[Error] {}".format(err))
+            self.launch_(input(self.PLACEHOLDER))
+            #try:
+            #    self.launch_(input(self.PLACEHOLDER))
+            #except Exception as err:
+            #    print("[Error] {}".format(err))
         if len(self.frames) > 0:
             if self.askyn(prompt="Save modifications?"):
                 self.save()
@@ -198,6 +203,10 @@ class MolEdit(ConsoleBase, RegisterFunction):
         """List all molecules in system"""
         for molnm, molids in self.molmat.clustering().items():
             print('- {} : {}'.format(molnm, ', '.join(str(i) for i in molids)))
+
+    def resort(self):
+        """Resort molecules in molecular name order"""
+        self.molmat.resort(MolOrder.MOL_ORDER)
     
     def save(self):
         """Save to the first loaded molecule/frame file"""

@@ -7,12 +7,13 @@ from gmx.chem.chem import Elements
 from gmx.io.baseio import GMXDomains
 from gmx.io.gro import readline_gro
 from gmx.io.pdb import readline_pdb
-from gmx.math.common import boxpara, rotate
+from gmx.math.common import rotate
 from gmx.math.rmsd import weight
 from gmx.other.data_type import GMXDataType
 from gmx.other.input_func import is_int
 from gmx.other.mol_order import MolOrder
 from gmx.structure.io_matrix import IOMatrix
+from gmx.structure.solvate_box import SolvateBox
 
 
 class SingleMol(object):
@@ -112,9 +113,11 @@ class SingleMol(object):
         return weight(self.xyzs, weight_factor)        
 
 
-class MolMatrix(IOMatrix):
+class MolMatrix(IOMatrix, SolvateBox):
     def __init__(self):
+        super().__init__()
         self.mols = []
+        self.total_atomn = 0
     
     def __len__(self):
         return len(self.mols)
@@ -197,17 +200,14 @@ class MolMatrix(IOMatrix):
 
     def to_gro(self, fpath):
         """Write molecules to GRO format file"""
-        system_xyzs = np.vstack([molmat.xyzs for molmat in self.mols])
-        total_atomn = system_xyzs.shape[0]
         with open(fpath, 'w') as f:
             # Default title
             f.write("GROtesk MACabre and Sinister\n")
             # Atom numbers
-            f.write("{0:>5}\n".format(total_atomn))
+            f.write("{0:>5}\n".format(self.total_atomn))
             f.writelines(molmat.to_gro() for molmat in self.mols)
             # Solvate box parameters
-            f.write("{0:>10.5f}{1:>10.5f}{2:>10.5f}\n".format(
-                *boxpara(system_xyzs)))
+            f.write("{0:>10.5f}{1:>10.5f}{2:>10.5f}\n".format(*self.boxpara))
 
     def resort(self, ordertype=None):
         if ordertype not in MolOrder:
@@ -218,6 +218,7 @@ class MolMatrix(IOMatrix):
             for mol in self.mols:
                 mol.start_atomid = count_atomn
                 count_atomn += mol.atomn
+            self.total_atomn = count_atomn
         elif ordertype in [MolOrder.MOL_ORDER, MolOrder.MOL_ORDER_ALPHA]:
             molreindex = 0
             mol_groups = self.clustering()
@@ -230,7 +231,8 @@ class MolMatrix(IOMatrix):
                     molreindex += 1
                     thismol.i = molreindex
                     thismol.start_atomid = count_atomn
-                    count_atomn += mol.atomn
+                    count_atomn += thismol.atomn
+            self.total_atomn = count_atomn
             self.mols.sort(key=lambda mol: mol.i)
     
     def append(self, mol):
@@ -261,3 +263,13 @@ class MolMatrix(IOMatrix):
             mol.i = molreindex
             self.mols.append(mol)
         self.resort(MolOrder.KEEP_ORDER)
+
+    def genbox(self, box_factor=1.):
+        """Generate solvate box and auto-center molecules"""
+        self.set_boxfactor(box_factor)
+        self.calc_boxpara(np.vstack([mol.xyzs for mol in self.mols]))
+    
+    def do_shift(self):
+        """Shift all molecules by a vector"""
+        for mol in self.mols:
+            mol.move(self.shift)

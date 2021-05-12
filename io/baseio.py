@@ -22,7 +22,7 @@ class GMXDomains(Enum):
     VX = "vx"
     VY = "vy"
     VZ = "vz"
-    VXZY = "velocity"
+    VXYZ = "velocity"
     LOC = "location"
     CHAIN = "chain"
     CODE = "code"

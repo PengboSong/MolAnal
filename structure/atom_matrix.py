@@ -131,7 +131,7 @@ class AtomMatrix(IOMatrix):
             f.write(outbuf)
             # Solvate box parameters
             f.write("{0:>10.5f}{1:>10.5f}{2:>10.5f}\n".format(
-                *boxpara(self.xyzs)))
+                *(boxpara(self.xyzs)[0])))
     
     def to_xyz(self, fpath):
         """Write molecules to XYZ format file"""
