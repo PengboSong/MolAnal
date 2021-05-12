@@ -138,9 +138,6 @@ class AtomMatrix(IOMatrix):
         outbuf = ""
 
         with open(fpath, 'w') as f:
-            for xyz in self.xyzs:
-                outbuf += IOMatrix.XYZ_FORMAT.format(*xyz)
-                # End line with LF
-                outbuf += '\n'
+            f.writelines(IOMatrix.XYZ_FORMAT.format(*xyz) + '\n' for xyz in self.xyzs)
             # End XYZ file with an extra empty line
-            f.write(outbuf + '\n')
+            f.write('\n')

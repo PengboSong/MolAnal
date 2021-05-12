@@ -79,6 +79,16 @@ class SingleMol(object):
             # End line with LF
             outbuf += '\n'
         return outbuf
+    
+    def to_xyz(self):
+        """Write molecule to XYZ format lines"""
+        outbuf = ""
+
+        for xyz in self.xyzs:
+            outbuf += IOMatrix.XYZ_FORMAT.format(*xyz)
+            # End line with LF
+            outbuf += '\n'
+        return outbuf
 
     def move(self, mvec):
         """Move molecule by a vector.
@@ -208,6 +218,13 @@ class MolMatrix(IOMatrix, SolvateBox):
             f.writelines(molmat.to_gro() for molmat in self.mols)
             # Solvate box parameters
             f.write("{0:>10.5f}{1:>10.5f}{2:>10.5f}\n".format(*self.boxpara))
+    
+    def to_xyz(self, fpath):
+        """Write molecules to XYZ format file"""
+        with open(fpath, 'w') as f:
+            f.writelines(molmat.to_xyz() for molmat in self.mols)
+            # End XYZ file with an extra empty line
+            f.write('\n')
 
     def resort(self, ordertype=None):
         if ordertype not in MolOrder:
