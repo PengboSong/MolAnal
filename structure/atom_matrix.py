@@ -120,7 +120,7 @@ class AtomMatrix(IOMatrix):
                         connects[b2] = set([b1])
                 for ba, bc in connects.items():
                     bc = sorted(list(bc))
-                    outbuf += f"CONECT{ba:>5d}" + ''.join([f'{a:>5d}' % a for a in bc]) + '\n'
+                    outbuf += f"CONECT{ba:>5d}" + ''.join([f'{a:>5d}' for a in bc]) + '\n'
             f.write(outbuf)
             f.write("END\n")
 
