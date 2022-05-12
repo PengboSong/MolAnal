@@ -20,6 +20,7 @@ class AtomMatrix(IOMatrix):
         self.molnms = []
         self.xyzs = np.array([], dtype=GMXDataType.REAL)
         self.velos = np.array([], dtype=GMXDataType.REAL)
+        self.bonds = np.array([], dtype=GMXDataType.INT)
 
     def append(self, atomnm, element, molid, molnm, x, y, z, vx=0., vy=0., vz=0.):
         """Add atom record to this matrix"""
@@ -35,6 +36,7 @@ class AtomMatrix(IOMatrix):
         """Convert coordinate and velocity matrix to matrix with 3 columns"""
         self.xyzs = np.asarray(self.xyzs, dtype=GMXDataType.REAL).reshape(-1, 3)
         self.velos = np.asarray(self.velos, dtype=GMXDataType.REAL).reshape(-1, 3)
+        self.bonds = np.asarray(self.bonds, dtype=GMXDataType.INT).reshape(-1, 2)
 
     def from_pdb(self, fpath):
         """Read atoms from PDB format file"""
@@ -101,9 +103,23 @@ class AtomMatrix(IOMatrix):
                     self.atoms, self.elements, self.molnms, self.molids, self.xyzs):
                 atomid += 1
                 outbuf += IOMatrix.PDB_FORMAT.format(
-                    atomid, atomn, molnm, molid, *xyz, 1., 0., element)
+                    atomid, atomnm, molnm, molid, *xyz, 1., 0., element)
                 # End line with LF
                 outbuf += '\n'
+            
+            if self.bonds.size != 0:
+                connects = {}
+                for b1, b2 in self.bonds:
+                    if b1 in connects:
+                        connects[b1].append(b2)
+                    else:
+                        connects[b1] = [b2]
+                    if b2 in connects:
+                        connects[b2].append(b1)
+                    else:
+                        connects[b2] = [b1]
+                for ba, bc in connects.items():
+                    outbuf += f"CONECT{ba:>5d}" + ''.join([f'{a:>5d}' % a for a in bc]) + '\n'
             f.write(outbuf)
             f.write("END\n")
 
