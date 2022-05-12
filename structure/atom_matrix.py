@@ -61,7 +61,7 @@ class AtomMatrix(IOMatrix):
             self.clean()
 
     def from_gro(self, fpath):
-        """Read molecules from GRO format file"""
+        """Read atoms from GRO format file"""
         with open(fpath, 'r') as f:
             f.readline()   # Skip title
             # Second line should be an integer equals to total atom numbers
@@ -94,7 +94,7 @@ class AtomMatrix(IOMatrix):
             self.clean()
 
     def to_pdb(self, fpath):
-        """Write molecules to PDB format file"""
+        """Write atoms to PDB format file"""
         outbuf = ""
 
         atomid = 0
@@ -111,20 +111,21 @@ class AtomMatrix(IOMatrix):
                 connects = {}
                 for b1, b2 in self.bonds:
                     if b1 in connects:
-                        connects[b1].append(b2)
+                        connects[b1].add(b2)
                     else:
-                        connects[b1] = [b2]
+                        connects[b1] = set([b2])
                     if b2 in connects:
-                        connects[b2].append(b1)
+                        connects[b2].add(b1)
                     else:
-                        connects[b2] = [b1]
+                        connects[b2] = set([b1])
                 for ba, bc in connects.items():
+                    bc = sorted(list(bc))
                     outbuf += f"CONECT{ba:>5d}" + ''.join([f'{a:>5d}' % a for a in bc]) + '\n'
             f.write(outbuf)
             f.write("END\n")
 
     def to_gro(self, fpath):
-        """Write molecules to GRO format file"""
+        """Write atoms to GRO format file"""
         outbuf = ""
 
         global_with_velo = True if np.linalg.norm(self.velos) > 1e-6 else False
@@ -150,7 +151,7 @@ class AtomMatrix(IOMatrix):
                 *(boxpara(self.xyzs)[0])))
     
     def to_xyz(self, fpath):
-        """Write molecules to XYZ format file"""
+        """Write atoms to XYZ format file"""
         outbuf = ""
 
         with open(fpath, 'w') as f:
